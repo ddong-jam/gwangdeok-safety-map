@@ -21,6 +21,9 @@ SITE = os.path.join(ROOT, "plans", "site.svg")
 # 도면은 남쪽이 위 (위성사진을 180° 돌린 방향)
 ARCHERY = (180, 228, 322, 266)        # 양궁장: 이 안의 선·글자는 모두 지운다
 ARCHERY_EDGE = (322, 228, 342, 266)   # 체육실동과 겹치는 곳: 양궁장 점무늬(아주 작은 조각)만 지운다
+# 도면 글씨를 지우고 웹 글꼴로 다시 쓰는 곳: (지울 영역, 글자, 가운데 좌표, 크기)
+RETEXT = [((231, 383, 277, 394), "대운동장", (254, 389), 17)]
+FONT = "Pretendard, 'Malgun Gothic', sans-serif"
 
 LINE = {"l": ("#475569", 0.6), "m": ("#1e293b", 1.0), "w": ("#0f172a", 1.7)}  # 색, 화면 px 굵기
 TEXT = "#0f172a"
@@ -152,7 +155,8 @@ def main():
         keep = []
         for sub in subpaths(a["d"]):
             pts = points(sub)
-            if pts and (inside(pts, ARCHERY) or (cls != "t" and inside(pts, ARCHERY_EDGE) and size(pts) <= 0.6)):
+            if pts and (inside(pts, ARCHERY) or (cls != "t" and inside(pts, ARCHERY_EDGE) and size(pts) <= 0.6)
+                        or (cls == "t" and any(inside(pts, r[0]) for r in RETEXT))):
                 removed += 1
                 continue
             keep.append(sub)
@@ -238,7 +242,10 @@ def main():
     for (x, y) in [(522, 381), (623, 381), (522, 479), (623, 479)]:
         deco.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{C["tree"]}" fill-opacity=".9"/>')
 
-    out = head + '<g id="deco">' + "".join(deco) + "</g>" + "".join(paths) + "</svg>"
+    texts = [f'<text x="{x}" y="{fmt(y + size * 0.36)}" font-size="{size}" font-weight="800" font-family="{FONT}" '
+             f'text-anchor="middle" fill="{TEXT}" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round" '
+             f'paint-order="stroke" letter-spacing="0.5">{word}</text>' for _, word, (x, y), size in RETEXT]
+    out = head + '<g id="deco">' + "".join(deco) + "</g>" + "".join(paths) + "".join(texts) + "</svg>"
     open(SITE, "w", encoding="utf-8").write(out)
     print(f"removed {removed} archery pieces, {len(deco)} deco shapes, {len(out) // 1024} KB")
 

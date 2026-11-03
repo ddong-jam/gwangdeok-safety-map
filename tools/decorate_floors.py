@@ -1,11 +1,12 @@
 """층별 평면도(plans/*.svg, 배치도 빼고)를 보기 좋게 꾸민다.
 
-- 교실 이름표 '호수 / 이름 / 반' 에서 가운데 이름(예: 생활수학)을 지운다 → '107 / 1 - 4'
-- 글씨를 진하고 굵게
+- 교실 이름표 '호수 / 이름 / 반' 에서 가운데 이름(예: 생활수학)을 지운다 → '107 / 1-4'
+- 덕린관 교실의 반 표시는 도면 글씨를 지우고 크게 새로 쓴다 (CLASS_TEXT 에서 반 이름을 바꿀 수 있다)
+- 다른 방 이름도 크게, 글씨는 진하고 굵게
 - 바닥 색: 방은 나무색, 복도는 연회색, 화장실(변기·세면대가 있는 방)은 하늘색 타일
 - 문(열리는 호)은 나무색, 변기·세면대 같은 위생기구는 파란 선
 
-usage: python tools/decorate_floors.py   (build_plans.py 다음에 실행. 여러 번 실행해도 결과는 같다)
+usage: python tools/decorate_floors.py   (build_plans.py 바로 다음에 한 번 실행. 이미 꾸민 도면은 건너뛴다)
 필요: pip install shapely
 """
 import glob
@@ -28,6 +29,19 @@ FLOOR = {"room": "#f5ead6", "hall": "#eceff3", "wet": "#dcebf7"}
 DOOR = "#b45309"           # 문: 나무색
 FIXTURE = "#0369a1"        # 변기·세면대: 파랑
 WALL_GAP = 0.9             # 선 사이 이만큼 벌어진 틈은 막힌 것으로 본다 (방 찾기)
+MARK = 'data-deco="floors"'
+
+LABEL_SCALE = 1.5          # 방 이름 글씨 키우기 (배)
+NUMBER_SCALE = 1.35        # 교실 호수(101 등) 키우기
+MIN_LABEL_H = 4.0          # 이보다 작은 글씨(DN·UP·높이 표시 등)는 그대로 둔다
+CLASS_SIZE = 12            # 새로 쓰는 반 표시 글자 크기 (도면 단위)
+FONT = "Pretendard, 'Malgun Gothic', sans-serif"
+# 덕린관 교실 반 표시: 왼쪽 교실(x01호)부터 차례대로
+CLASS_TEXT = {
+    "b2-1f": [f"1-{n}" for n in range(10, 0, -1)],
+    "b2-3f": [f"3-{n}" for n in range(10, 0, -1)],
+    "b2-4f": [f"2-{n}" for n in range(9, 0, -1)] + ["자습실"],   # 2-1 자리는 자습실, 나머지는 하나씩 당김
+}
 
 
 # ── 교실 이름표 ─────────────────────────────────────
@@ -44,7 +58,7 @@ def text_pieces(tags):
     return out
 
 
-def label_blocks(ps, pad=2.2, pad_y=7.0):
+def label_blocks(ps, pad=4.5, pad_y=7.0):
     """가까운 글자 조각끼리 묶어 이름표 덩어리를 만든다."""
     parent = list(range(len(ps)))
 
@@ -106,14 +120,51 @@ def is_class_row(r):
     return (has_dash or g >= h) and span(left) > 0.6 * h and span(right) > 0.6 * h
 
 
-def subject_names(tags):
-    """지울 글자 조각 (하위 경로 문자열) 집합."""
-    drop = set()
+def bbox(ps):
+    return min(p[0] for p in ps), min(p[1] for p in ps), max(p[2] for p in ps), max(p[3] for p in ps)
+
+
+def scaled(ps, k):
+    """글자 조각들을 가운데를 기준으로 k 배 키운 path."""
+    x0, y0, x1, y1 = bbox(ps)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    d = "".join(p[4] for p in ps)
+    if k == 1:
+        return f'<path class="t" fill="{TEXT}" stroke="{TEXT}" stroke-width="{TEXT_BOLD}" stroke-linejoin="round" d="{d}"/>'
+    return (f'<path class="t" fill="{TEXT}" stroke="{TEXT}" stroke-width="{fmt(TEXT_BOLD / k)}" stroke-linejoin="round" '
+            f'transform="matrix({k} 0 0 {k} {fmt(cx * (1 - k))} {fmt(cy * (1 - k))})" d="{d}"/>')
+
+
+def text_layer(tags, floor_id):
+    """글씨 전부를 다시 그린다: 과목실 이름 지우기, 반 표시 새로 쓰기, 방 이름 키우기."""
+    out, small, rooms = [], [], []
     for block in label_blocks(text_pieces(tags)):
         rs = text_rows(block)
         if len(rs) == 3 and is_class_row(rs[2]) and all(r["y1"] - r["y0"] > 2 for r in rs):
-            drop.update(p[4] for p in rs[1]["p"])
-    return drop
+            rooms.append(rs)  # 교실: 호수 / 이름 / 반
+        elif max(r["y1"] - r["y0"] for r in rs) >= MIN_LABEL_H:
+            out.append(scaled(block, LABEL_SCALE))
+        else:
+            small += block
+
+    names = CLASS_TEXT.get(floor_id)
+    if names and len(names) != len(rooms):
+        print(f"  ! {floor_id}: 교실 {len(rooms)}곳을 찾았는데 반 이름은 {len(names)}개 → 원래 글씨를 키우기만 한다")
+        names = None
+    rooms.sort(key=lambda rs: rs[2]["x0"])
+    for i, (num, _name, cls) in enumerate(rooms):
+        if names:
+            out.append(scaled(num["p"], NUMBER_SCALE))
+            cx = (cls["x0"] + cls["x1"]) / 2
+            cy = (_name["y0"] + cls["y1"]) / 2 + 1
+            size = CLASS_SIZE if len(names[i]) <= 4 else CLASS_SIZE * 0.8
+            out.append(f'<text x="{fmt(cx)}" y="{fmt(cy + size * 0.36)}" font-size="{fmt(size)}" font-weight="800" '
+                       f'font-family="{FONT}" text-anchor="middle" fill="{TEXT}" letter-spacing="-0.3">{names[i]}</text>')
+        else:
+            out.append(scaled(num["p"] + cls["p"], LABEL_SCALE))
+    if small:
+        out.append(scaled(small, 1))
+    return out, len(rooms)
 
 
 # ── 문 · 위생기구 ───────────────────────────────────
@@ -185,35 +236,30 @@ def floor_regions(lines, W, H):
 def classify(region, fixtures):
     thick = 2 * region.area / region.length
     length = region.length / 2
-    inside = sum(1 for f in fixtures if region.contains(f))
-    if inside >= 2:
-        return "wet"
     if length / thick > 8:
         return "hall" if 12 <= thick < 35 else None  # 폭이 아주 좁고 긴 것은 치수 띠 → 칠하지 않음
-    return "room"
+    inside = sum(1 for f in fixtures if region.contains(f))
+    return "wet" if inside >= 2 else "room"
 
 
 def decorate(path):
     s = open(path, encoding="utf-8").read()
-    s = re.sub(r'<g id="deco">.*?</g>', "", s, flags=re.S)
+    if MARK in s:
+        return None  # 이미 꾸민 도면 (글씨를 두 번 키우지 않게)
     head = s[: s.index(">", s.index("<svg")) + 1]
     W, H = map(float, re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', head).groups())
     tags = [attrs_of(t) for t in re.findall(r"<path [^>]*/>", s)]
 
-    drop = subject_names(tags)
+    texts, rooms = text_layer(tags, os.path.basename(path)[:-4])
     lines, fixtures = [], []
     doors_d, fixtures_d = [], []
     out = []
     for a in tags:
         cls = a["class"]
-        if cls in ("door", "fixture"):  # 이전 실행에서 나눠 둔 것 → 원래 선으로 되돌려 다시 판단
-            cls = "m"
+        if cls == "t":
+            continue  # 글씨는 text_layer 가 따로 그린다
         keep = []
         for sub in subpaths(a["d"]):
-            if cls == "t":
-                if sub not in drop:
-                    keep.append(sub)
-                continue
             pts = points(sub)
             kind = door_or_fixture(sub, pts) if cls in ("m", "l", "w") else None
             if kind == "door":
@@ -230,9 +276,7 @@ def decorate(path):
         if not keep:
             continue
         d = "".join(keep)
-        if cls == "t":
-            out.append(f'<path class="t" fill="{TEXT}" stroke="{TEXT}" stroke-width="{TEXT_BOLD}" stroke-linejoin="round" d="{d}"/>')
-        elif cls == "h":
+        if cls == "h":
             out.append(f'<path class="h" fill="{a.get("fill", "#d1d5db")}" d="{d}"/>')
         else:
             out.append(f'<path class="{cls}" fill="none" stroke="{a["stroke"]}" stroke-linecap="round" '
@@ -259,10 +303,11 @@ def decorate(path):
                 d = "".join(poly_d(g) for g in parts if not g.is_empty)
             deco.append(f'<path fill="{FLOOR[kind]}" fill-rule="evenodd" d="{d}"/>')
 
-    result = head + '<g id="deco">' + "".join(deco) + "</g>" + "".join(out) + "</svg>"
+    head = head.replace("<svg", f"<svg {MARK}", 1)
+    result = head + '<g id="deco">' + "".join(deco) + "</g>" + "".join(out) + "".join(texts) + "</svg>"
     open(path, "w", encoding="utf-8").write(result)
     counts = {k: len(v) for k, v in by_kind.items()}
-    return len(drop), len(doors_d), len(fixtures_d), counts, len(result) // 1024
+    return rooms, len(doors_d), len(fixtures_d), counts, len(result) // 1024
 
 
 def main():
@@ -270,8 +315,12 @@ def main():
     for path in sorted(glob.glob(os.path.join(ROOT, "plans", "*.svg"))):
         if os.path.basename(path) == "site.svg":
             continue
-        names, doors, fixtures, counts, kb = decorate(path)
-        print(f"{os.path.basename(path):12} 이름 조각 {names:4}  문 {doors:3}  기구 {fixtures:3}  바닥 {counts}  {kb} KB")
+        res = decorate(path)
+        if res is None:
+            print(f"{os.path.basename(path):12} 이미 꾸민 도면이라 건너뜀 (build_plans.py 로 다시 만든 뒤 실행)")
+            continue
+        rooms, doors, fixtures, counts, kb = res
+        print(f"{os.path.basename(path):12} 교실 {rooms:3}  문 {doors:3}  기구 {fixtures:3}  바닥 {counts}  {kb} KB")
 
 
 if __name__ == "__main__":
