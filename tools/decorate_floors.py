@@ -16,6 +16,7 @@ import sys
 
 from shapely.geometry import LineString, Point
 from shapely.ops import unary_union
+from shapely.strtree import STRtree
 from shapely.geometry import box
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -35,6 +36,7 @@ LABEL_SCALE = 1.5          # 방 이름 글씨 키우기 (배)
 NUMBER_SCALE = 1.35        # 교실 호수(101 등) 키우기
 MIN_LABEL_H = 4.0          # 이보다 작은 글씨(DN·UP·높이 표시 등)는 그대로 둔다
 CLASS_SIZE = 12            # 새로 쓰는 반 표시 글자 크기 (도면 단위)
+CLASS_COLOR = "#1d4ed8"    # 반 표시 색 (파랑)
 FONT = "Pretendard, 'Malgun Gothic', sans-serif"
 # 덕린관 교실 반 표시: 왼쪽 교실(x01호)부터 차례대로
 CLASS_TEXT = {
@@ -124,26 +126,193 @@ def bbox(ps):
     return min(p[0] for p in ps), min(p[1] for p in ps), max(p[2] for p in ps), max(p[3] for p in ps)
 
 
-def scaled(ps, k):
-    """글자 조각들을 가운데를 기준으로 k 배 키운 path."""
-    x0, y0, x1, y1 = bbox(ps)
+def scaled(ps, k, to=None, color=TEXT, around=None):
+    """글자 조각들을 가운데(around 를 주면 그 덩어리의 가운데)를 기준으로 k 배 키운 path.
+    to 를 주면 그 좌표로 옮긴다."""
+    x0, y0, x1, y1 = bbox(around or ps)
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    nx, ny = to or (cx, cy)
     d = "".join(p[4] for p in ps)
-    if k == 1:
-        return f'<path class="t" fill="{TEXT}" stroke="{TEXT}" stroke-width="{TEXT_BOLD}" stroke-linejoin="round" d="{d}"/>'
-    return (f'<path class="t" fill="{TEXT}" stroke="{TEXT}" stroke-width="{fmt(TEXT_BOLD / k)}" stroke-linejoin="round" '
-            f'transform="matrix({k} 0 0 {k} {fmt(cx * (1 - k))} {fmt(cy * (1 - k))})" d="{d}"/>')
+    if k == 1 and not to:
+        return f'<path class="t" fill="{color}" stroke="{color}" stroke-width="{TEXT_BOLD}" stroke-linejoin="round" d="{d}"/>'
+    return (f'<path class="t" fill="{color}" stroke="{color}" stroke-width="{fmt(TEXT_BOLD / k)}" stroke-linejoin="round" '
+            f'transform="matrix({k} 0 0 {k} {fmt(nx - k * cx)} {fmt(ny - k * cy)})" d="{d}"/>')
 
 
-def text_layer(tags, floor_id):
-    """글씨 전부를 다시 그린다: 과목실 이름 지우기, 반 표시 새로 쓰기, 방 이름 키우기."""
-    out, small, rooms = [], [], []
+def x_groups(ps, gap=0.35):
+    """한 줄의 글자 조각을 글자(음절) 단위로 묶는다."""
+    gs = []
+    for p in sorted(ps, key=lambda p: p[0]):
+        if gs and p[0] <= gs[-1]["x1"] + gap:
+            gs[-1]["p"].append(p)
+            gs[-1]["x1"] = max(gs[-1]["x1"], p[2])
+        else:
+            gs.append({"x0": p[0], "x1": p[2], "p": [p]})
+    return gs
+
+
+def syllables(ps, h):
+    """글자 조각을 한 글자씩 묶는다. '사' 의 ㅅ·ㅏ 처럼 떨어진 좁은 조각 둘은
+    합친 폭이 글자 높이 정도면 한 글자로 본다."""
+    out = []
+    for g in x_groups(ps, gap=0):
+        last = out[-1] if out else None
+        if (last and last["n"] == 1 and last["x1"] - last["x0"] < 0.75 * h
+                and g["x1"] - g["x0"] < 0.75 * h and g["x1"] - last["x0"] <= 1.1 * h):
+            last["p"] += g["p"]
+            last["x1"] = max(last["x1"], g["x1"])
+            last["n"] = 2
+        else:
+            out.append({"x0": g["x0"], "x1": g["x1"], "p": list(g["p"]), "n": 1})
+    return out
+
+
+def split_row(ps):
+    """한 줄을 두 줄로 나눈다: 띄어쓰기가 있으면 가운데에 가까운 띄어쓰기에서,
+    없으면 글자 수의 절반에서 (윗줄이 한 글자 더 길게)."""
+    _, y0, _, y1 = bbox(ps)
+    h = y1 - y0
+    sy = syllables(ps, h)
+    if len(sy) < 2:
+        return None
+    gaps = [sy[i + 1]["x0"] - sy[i]["x1"] for i in range(len(sy) - 1)]
+    usual = sorted(gaps)[len(gaps) // 2]
+    spaces = [i for i, g in enumerate(gaps) if g >= max(0.3 * h, 2 * usual)]
+    if spaces:
+        mid = (sy[0]["x0"] + sy[-1]["x1"]) / 2
+        i = min(spaces, key=lambda i: abs((sy[i]["x1"] + sy[i + 1]["x0"]) / 2 - mid))
+    else:
+        i = (len(sy) + 1) // 2 - 1
+    return [p for g in sy[:i + 1] for p in g["p"]], [p for g in sy[i + 1:] for p in g["p"]]
+
+
+def is_toilet_label(rs):
+    """첫 줄이 'W101' 처럼 W 로 시작하고 아래에 한 줄(화장실)이 더 있으면 화장실 이름표.
+    W 는 가늘고 긴 획 4개가 겹쳐 그려져 있어서, 줄 맨 앞의 가는 획 수로 알아본다."""
+    if len(rs) < 2:
+        return False
+    r = rs[0]
+    h = max(p[3] - p[1] for p in r["p"])
+    if h < 2:
+        return False
+    x0 = min(p[0] for p in r["p"])
+    strokes = [p for p in r["p"] if p[0] < x0 + 0.75 * h and p[2] - p[0] < 0.3 * h and p[3] - p[1] > 0.85 * h]
+    return len(strokes) >= 3
+
+
+class Label:
+    """여러 줄(줄마다 글자 조각·색)을 한 덩어리로 키우고, 필요하면 두 줄로 나누고, 옮긴다."""
+
+    def __init__(self, rows, k):
+        self.rows = rows          # [(조각들, 색)]
+        self.k = k
+        x0, y0, x1, y1 = bbox([p for ps, _ in rows for p in ps])
+        self.c = ((x0 + x1) / 2, (y0 + y1) / 2)
+        self.to = None
+        self.layout = [(ps, col, 0.0, 0.0) for ps, col in rows]   # 줄마다 (조각, 색, dx, dy)
+
+    def size(self):
+        """키운 뒤의 너비·높이."""
+        boxes = [(a + dx, b + dy, c + dx, d + dy) for ps, _, dx, dy in self.layout for a, b, c, d in [bbox(ps)]]
+        w = max(b[2] for b in boxes) - min(b[0] for b in boxes)
+        h = max(b[3] for b in boxes) - min(b[1] for b in boxes)
+        return w * self.k, h * self.k
+
+    def wrap(self):
+        """가장 긴 줄을 두 줄로 나눠 다시 쌓는다."""
+        lines = list(self.rows)
+        widths = [bbox(ps)[2] - bbox(ps)[0] for ps, _ in lines]
+        i = widths.index(max(widths))
+        parts = split_row(lines[i][0])
+        if not parts:
+            return False
+        lines[i:i + 1] = [(parts[0], lines[i][1]), (parts[1], lines[i][1])]
+        heights = [bbox(ps)[3] - bbox(ps)[1] for ps, _ in lines]
+        gap = 0.45 * max(heights)
+        y = self.c[1] - (sum(heights) + gap * (len(lines) - 1)) / 2
+        self.layout = []
+        for (ps, col), h in zip(lines, heights):
+            a, b, c, d = bbox(ps)
+            self.layout.append((ps, col, self.c[0] - (a + c) / 2, y - b))
+            y += h + gap
+        return True
+
+    def box(self, at=None, margin=0.0):
+        w, h = self.size()
+        cx, cy = at or self.to or self.c
+        return box(cx - w / 2 - margin, cy - h / 2 - margin, cx + w / 2 + margin, cy + h / 2 + margin)
+
+    def svg(self):
+        k, (cx, cy) = self.k, self.c
+        nx, ny = self.to or self.c
+        out = []
+        for ps, col, dx, dy in self.layout:
+            tx, ty = nx + k * (dx - cx), ny + k * (dy - cy)
+            d = "".join(p[4] for p in ps)
+            out.append(f'<path class="t" fill="{col}" stroke="{col}" stroke-width="{fmt(TEXT_BOLD / k)}" '
+                       f'stroke-linejoin="round" transform="matrix({fmt(k)} 0 0 {fmt(k)} {fmt(tx)} {fmt(ty)})" d="{d}"/>')
+        return "".join(out)
+
+
+def room_width(regions, x, y):
+    """(x, y) 가 들어 있는 방에서 그 높이의 가로 폭."""
+    pt = Point(x, y)
+    for r in regions:
+        if r.contains(pt):
+            minx, _, maxx, _ = r.bounds
+            seg = LineString([(minx - 1, y), (maxx + 1, y)]).intersection(r)
+            for part in getattr(seg, "geoms", [seg]):
+                if part.length and part.distance(pt) < 1e-6:
+                    return part.length
+    return None
+
+
+def fit(label, regions):
+    """방보다 넓으면 두 줄로 나누고, 그래도 넓으면 조금 줄인다 (원래 크기보다 작게는 안 함)."""
+    room = room_width(regions, *label.c)
+    if not room:
+        return
+    limit = room * 0.9
+    if label.size()[0] > limit:
+        label.wrap()
+    w = label.size()[0]
+    if w > limit:
+        label.k = max(1.0, label.k * limit / w)
+
+
+def find_spot(label, obstacles, taken, W, H):
+    """화장실 이름표: 선과 겹치지 않는 가장 가까운 빈 곳 (아래쪽 먼저)."""
+    cx, cy = label.c
+    cands = []
+    for dy in range(-60, 91, 3):
+        for dx in range(-60, 61, 3):
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist <= 90:
+                cands.append((dist + (25 if dy < 0 else 0), dx, dy))
+    for _, dx, dy in sorted(cands):
+        b = label.box((cx + dx, cy + dy), margin=1.2)
+        if b.bounds[0] < 0 or b.bounds[1] < 0 or b.bounds[2] > W or b.bounds[3] > H:
+            continue
+        if len(obstacles.query(b, predicate="intersects")) or any(b.intersects(t) for t in taken):
+            continue
+        return (cx + dx, cy + dy)
+    return None
+
+
+def text_layer(tags, floor_id, regions, obstacles, W, H):
+    """글씨 전부를 다시 그린다: 과목실 이름 지우기, 반 표시 새로 쓰기, 방 이름 키우기·줄 바꾸기, 화장실 이름 옮기기."""
+    out, small, rooms, labels, toilets = [], [], [], [], []
     for block in label_blocks(text_pieces(tags)):
         rs = text_rows(block)
         if len(rs) == 3 and is_class_row(rs[2]) and all(r["y1"] - r["y0"] > 2 for r in rs):
             rooms.append(rs)  # 교실: 호수 / 이름 / 반
+        elif len(rs) == 2 and is_class_row(rs[1]) and rs[0]["y1"] - rs[0]["y0"] > 2:
+            # '201 / 1-1' 처럼 호수와 반만 있는 교실: 반 표시만 파랗게
+            labels.append(Label([(rs[0]["p"], TEXT), (rs[1]["p"], CLASS_COLOR)], LABEL_SCALE))
         elif max(r["y1"] - r["y0"] for r in rs) >= MIN_LABEL_H:
-            out.append(scaled(block, LABEL_SCALE))
+            lab = Label([(r["p"], TEXT) for r in rs], LABEL_SCALE)
+            fit(lab, regions)
+            (toilets if is_toilet_label(rs) else labels).append(lab)
         else:
             small += block
 
@@ -159,12 +328,22 @@ def text_layer(tags, floor_id):
             cy = (_name["y0"] + cls["y1"]) / 2 + 1
             size = CLASS_SIZE if len(names[i]) <= 4 else CLASS_SIZE * 0.8
             out.append(f'<text x="{fmt(cx)}" y="{fmt(cy + size * 0.36)}" font-size="{fmt(size)}" font-weight="800" '
-                       f'font-family="{FONT}" text-anchor="middle" fill="{TEXT}" letter-spacing="-0.3">{names[i]}</text>')
+                       f'font-family="{FONT}" text-anchor="middle" fill="{CLASS_COLOR}" letter-spacing="-0.3">{names[i]}</text>')
         else:
-            out.append(scaled(num["p"] + cls["p"], LABEL_SCALE))
+            labels.append(Label([(num["p"], TEXT), (cls["p"], CLASS_COLOR)], LABEL_SCALE))
+
+    taken = [lab.box(margin=0.5) for lab in labels]
+    moved = 0
+    for lab in toilets:
+        spot = find_spot(lab, obstacles, taken, W, H)
+        if spot and spot != lab.c:
+            lab.to = spot
+            moved += 1
+        taken.append(lab.box(margin=0.5))
+    out += [lab.svg() for lab in labels + toilets]
     if small:
         out.append(scaled(small, 1))
-    return out, len(rooms)
+    return out, len(rooms), moved
 
 
 # ── 문 · 위생기구 ───────────────────────────────────
@@ -250,8 +429,7 @@ def decorate(path):
     W, H = map(float, re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', head).groups())
     tags = [attrs_of(t) for t in re.findall(r"<path [^>]*/>", s)]
 
-    texts, rooms = text_layer(tags, os.path.basename(path)[:-4])
-    lines, fixtures = [], []
+    lines, fixtures, fixture_lines = [], [], []
     doors_d, fixtures_d = [], []
     out = []
     for a in tags:
@@ -269,6 +447,8 @@ def decorate(path):
                 fixtures_d.append(sub)
                 xs, ys = [p[0] for p in pts], [p[1] for p in pts]
                 fixtures.append(Point((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2))
+                if len(pts) > 1:
+                    fixture_lines.append(LineString(pts))
             else:
                 keep.append(sub)
             if cls in ("w", "m") and len(pts) > 1 and kind != "fixture":
@@ -288,6 +468,8 @@ def decorate(path):
 
     deco = []
     regions = floor_regions(lines, W, H)
+    obstacles = STRtree(lines + fixture_lines)
+    texts, rooms, moved = text_layer(tags, os.path.basename(path)[:-4], regions, obstacles, W, H)
     by_kind = {}
     for r in regions:
         kind = classify(r, fixtures)
@@ -307,7 +489,7 @@ def decorate(path):
     result = head + '<g id="deco">' + "".join(deco) + "</g>" + "".join(out) + "".join(texts) + "</svg>"
     open(path, "w", encoding="utf-8").write(result)
     counts = {k: len(v) for k, v in by_kind.items()}
-    return rooms, len(doors_d), len(fixtures_d), counts, len(result) // 1024
+    return rooms, moved, len(doors_d), len(fixtures_d), counts, len(result) // 1024
 
 
 def main():
@@ -319,8 +501,8 @@ def main():
         if res is None:
             print(f"{os.path.basename(path):12} 이미 꾸민 도면이라 건너뜀 (build_plans.py 로 다시 만든 뒤 실행)")
             continue
-        rooms, doors, fixtures, counts, kb = res
-        print(f"{os.path.basename(path):12} 교실 {rooms:3}  문 {doors:3}  기구 {fixtures:3}  바닥 {counts}  {kb} KB")
+        rooms, moved, doors, fixtures, counts, kb = res
+        print(f"{os.path.basename(path):12} 교실 {rooms:3}  화장실 이름 옮김 {moved}  문 {doors:3}  기구 {fixtures:3}  바닥 {counts}  {kb} KB")
 
 
 if __name__ == "__main__":
