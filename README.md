@@ -65,7 +65,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=5` 숫자를 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=6` 숫자를 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -81,16 +81,20 @@ style.css      화면 꾸미기
 supabase.sql   공용 모드 데이터베이스 만들기
 serve.py       내 컴퓨터용 테스트 서버
 plans/*.svg    배치도 + 층별 평면도
-tools/         PDF → SVG 변환
+tools/         PDF → SVG 변환, 배치도 꾸미기
 ```
 
 ## 도면 다시 만들기
 
-원본 PDF가 바뀌면 다음 명령으로 `plans/` 를 다시 만듭니다 (`pip install pymupdf` 필요).
+원본 PDF가 바뀌면 다음 명령으로 `plans/` 를 다시 만듭니다 (`pip install pymupdf shapely` 필요).
 
 ```bash
 python tools/build_plans.py "전체배치도.pdf" "광덕중.고등학교 [면적 최종].pdf"
+python tools/decorate_site.py
 ```
+
+`decorate_site.py` 는 전체 배치도를 위성사진처럼 꾸밉니다: 선을 진하게, 없어진 양궁장 지우기,
+도로·운동장(트랙·인조잔디)·중정·주차장·숲·나무 색칠. 위치나 색은 파일 위쪽의 숫자로 바꿀 수 있습니다.
 
 원본 PDF는 저장소에 넣지 않습니다.
 
@@ -99,3 +103,11 @@ python tools/build_plans.py "전체배치도.pdf" "광덕중.고등학교 [면�
 - **부3 화장실**은 배치도에 위치가 없어 지도 윤곽 없이 건물 목록에서만 열립니다.
 - 방 이름은 PDF에서 글자가 아니라 선으로 들어 있어 검색되지 않습니다. 신고할 때 "정확한 장소"에 적어주세요.
 - 버전 1(HTML/JS)은 `v1.0.0` 태그에 그대로 남아 있습니다.
+
+## 버전
+
+| 버전 | 내용 |
+|---|---|
+| v2.1.0 | 전체 배치도 꾸미기 (위성사진 참고), 양궁장 삭제, 배치도 선 진하게 |
+| v2.0.0 | 파이썬(PyScript)으로 다시 작성, 학생용·선생님용 두 페이지, 확대 범위 제한, 치수선 삭제 |
+| v1.0.0 | 첫 버전 (HTML/JS) |
