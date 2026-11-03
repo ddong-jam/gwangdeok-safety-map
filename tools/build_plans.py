@@ -2,7 +2,7 @@
 
 usage: python tools/build_plans.py <전체배치도.pdf> <면적 PDF>
 """
-import os, sys, json
+import os, sys
 import pymupdf
 sys.path.insert(0, os.path.dirname(__file__))
 from pdf2svg import convert
@@ -24,17 +24,13 @@ SITE_CROP = pymupdf.Rect(160, 97.44, 1035, 775)
 CROPS = {"b5-1f": pymupdf.Rect(335, 150, 875, 650), "wc-1f": pymupdf.Rect(232, 78, 968, 714)}
 
 def main(site_pdf, area_pdf):
-    sizes = {}
     svg, crop = convert(pymupdf.open(site_pdf)[0], "site", crop=SITE_CROP)
     open(os.path.join(ROOT, "plans", "site.svg"), "w", encoding="utf-8").write(svg)
-    sizes["site"] = [round(crop.width, 2), round(crop.height, 2)]
     doc = pymupdf.open(area_pdf)
     for pid, n in PAGES.items():
         svg, crop = convert(doc[n - 1], "floor", crop=CROPS.get(pid))
         open(os.path.join(ROOT, "plans", pid + ".svg"), "w", encoding="utf-8").write(svg)
-        sizes[pid] = [round(crop.width, 2), round(crop.height, 2)]
-        print(pid, sizes[pid], len(svg) // 1024, "KB")
-    json.dump(sizes, open(os.path.join(ROOT, "data", "plan-sizes.json"), "w"), indent=1)
+        print(pid, round(crop.width, 2), round(crop.height, 2), len(svg) // 1024, "KB")
 
 if __name__ == "__main__":
     main(sys.argv[1], sys.argv[2])

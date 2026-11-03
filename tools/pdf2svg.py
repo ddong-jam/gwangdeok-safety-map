@@ -58,6 +58,7 @@ def convert(page, mode, margin=14, crop=None):
     for g, r in drawings:
         if not r.intersects(crop): continue
         cls = classify(g)
+        if cls == "l" and mode != "site": continue  # 층 평면도의 치수선·격자선·잔선은 뺀다 (배치도는 도로·운동장이라 둔다)
         w = round(g.get("width") or 0, 2)
         if cls == "m": w = max(w, 0.3)
         key = (cls, w if cls != "t" and cls != "h" else 0)
