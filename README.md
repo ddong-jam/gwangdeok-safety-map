@@ -65,7 +65,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=7` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=8` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -91,10 +91,15 @@ tools/         PDF → SVG 변환, 배치도 꾸미기
 ```bash
 python tools/build_plans.py "전체배치도.pdf" "광덕중.고등학교 [면적 최종].pdf"
 python tools/decorate_site.py
+python tools/decorate_floors.py
 ```
 
-`decorate_site.py` 는 전체 배치도를 위성사진처럼 꾸밉니다: 선을 진하게, 없어진 양궁장 지우기,
-도로·운동장(트랙·인조잔디)·중정·주차장·숲·나무 색칠. 위치나 색은 파일 위쪽의 숫자로 바꿀 수 있습니다.
+- `decorate_site.py`: 전체 배치도를 위성사진처럼 꾸밉니다. 선을 진하게, 없어진 양궁장 지우기,
+  도로·운동장(트랙·인조잔디)·중정·주차장·숲·나무 색칠.
+- `decorate_floors.py`: 층별 평면도를 꾸밉니다. 교실 이름표의 과목실 이름(예: 생활수학)을 지워 `호수 / 반` 만 남기기,
+  글씨 진하고 굵게, 방은 나무색·복도는 회색·화장실은 하늘색 바닥, 문은 나무색, 변기·세면대는 파란 선.
+
+위치나 색은 각 파일 위쪽의 숫자로 바꿀 수 있습니다. 도면을 다시 만든 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올립니다.
 
 원본 PDF는 저장소에 넣지 않습니다.
 
@@ -108,6 +113,7 @@ python tools/decorate_site.py
 
 | 버전 | 내용 |
 |---|---|
+| v2.1.1 | 층별 평면도 꾸미기 (바닥·문·위생기구 색), 교실 글씨 진하게, 교실 옆 과목실 이름 삭제 |
 | v2.1.0 | 전체 배치도 꾸미기 (위성사진 참고), 양궁장 삭제, 배치도 선 진하게 |
 | v2.0.0 | 파이썬(PyScript)으로 다시 작성, 학생용·선생님용 두 페이지, 확대 범위 제한, 치수선 삭제 |
 | v1.0.0 | 첫 버전 (HTML/JS) |

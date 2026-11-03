@@ -13,7 +13,7 @@ from common import esc, on
 NS = "http://www.w3.org/2000/svg"
 ROOM = 1.3       # 도면 크기의 130% 까지만 멀어지고, 그 밖으로는 끌고 갈 수 없다
 MAX_ZOOM = 10    # 가장 멀리 본 것보다 10배까지 가까이
-PLANS_VERSION = "2.1.0"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
+PLANS_VERSION = "2.1.1"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
 PIN_PATH = "M0 0C-1.6-5.4-11-9.6-11-18.5a11 11 0 0 1 22 0C11-9.6 1.6-5.4 0 0z"
 _svg_cache = {}
 
