@@ -13,7 +13,7 @@ from common import esc, on
 NS = "http://www.w3.org/2000/svg"
 ROOM = 1.3       # 도면 크기의 130% 까지만 멀어지고, 그 밖으로는 끌고 갈 수 없다
 MAX_ZOOM = 10    # 가장 멀리 본 것보다 10배까지 가까이
-PLANS_VERSION = "2.1.3"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
+PLANS_VERSION = "2.1.5"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
 PIN_PATH = "M0 0C-1.6-5.4-11-9.6-11-18.5a11 11 0 0 1 22 0C11-9.6 1.6-5.4 0 0z"
 _svg_cache = {}
 
@@ -59,17 +59,20 @@ class PlanViewer:
         self.view = [0.0, 0.0, 100.0, 100.0]
         self.on_tap = None          # (x, y, 누른 요소) → 도면 좌표로 알려준다
         self.on_view_change = None
+        self.locked = False         # True 면 확대·이동 없이 전체만 보여준다 (캠퍼스 배치도)
         self._token = 0
         self._pointers = {}
         self._drag = None
         self._pinch = None
         self._raf = None
         self._bind()
-        ResizeObserver.new(create_proxy(lambda *a: self.apply())).observe(svg)
+        ResizeObserver.new(create_proxy(lambda *a: self.fit() if self.locked else self.apply())).observe(svg)
 
     # ── 도면 불러오기 ──
-    async def load(self, url):
+    async def load(self, url, locked=False):
         self._token += 1
+        self.locked = locked
+        self.svg.classList.toggle("is-locked", locked)
         token = self._token
         self.layers["plan"].innerHTML = ""
         self.svg.classList.add("is-loading")
@@ -108,6 +111,8 @@ class PlanViewer:
         self.apply()
 
     def zoom_by(self, factor, cx=None, cy=None):
+        if self.locked:
+            return
         x, y, w, h = self.view
         k = 1 / factor
         if cx is None:
@@ -176,6 +181,8 @@ class PlanViewer:
         svg = self.svg
 
         def wheel(e):
+            if self.locked:
+                return
             e.preventDefault()
             x, y = self.to_plan(e.clientX, e.clientY)
             self.zoom_by(math.exp(-e.deltaY * (0.01 if e.ctrlKey else 0.0015)), x, y)
@@ -187,7 +194,7 @@ class PlanViewer:
             self._pointers[e.pointerId] = (e.clientX, e.clientY)
             if len(self._pointers) == 1:
                 self._drag = {"sx": e.clientX, "sy": e.clientY, "view": list(self.view), "moved": False, "target": e.target}
-            elif len(self._pointers) == 2:
+            elif len(self._pointers) == 2 and not self.locked:
                 (ax, ay), (bx, by) = list(self._pointers.values())[:2]
                 self._pinch = {"dist": math.hypot(ax - bx, ay - by), "view": list(self.view)}
                 self._drag = None
@@ -209,8 +216,9 @@ class PlanViewer:
                 dx, dy = e.clientX - self._drag["sx"], e.clientY - self._drag["sy"]
                 if math.hypot(dx, dy) > 4:
                     self._drag["moved"] = True
-                    svg.classList.add("is-panning")
-                if self._drag["moved"]:
+                    if not self.locked:
+                        svg.classList.add("is-panning")
+                if self._drag["moved"] and not self.locked:
                     vx, vy, vw, vh = self._drag["view"]
                     s = max(vw / r.width, vh / r.height)
                     self.view = [vx - dx * s, vy - dy * s, vw, vh]

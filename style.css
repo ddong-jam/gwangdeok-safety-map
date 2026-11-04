@@ -77,6 +77,8 @@ svg { display: block; }
 /* ── 지도 ───────────────────────────── */
 .map { width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
 .map.is-panning { cursor: grabbing; }
+.map.is-locked { cursor: default; }
+.map.is-locked ~ .map-tools { display: none; }
 .map.is-loading .layer-plan { opacity: 0; }
 .layer-plan { transition: opacity .2s; }
 .map .layer-plan > path.l { transition: opacity .2s; }

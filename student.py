@@ -72,7 +72,7 @@ async def navigate(place, after=None):
     if changed:
         state["loaded"] = place
         try:
-            if not await viewer.load(plan_url(place)):
+            if not await viewer.load(plan_url(place), locked=place == SITE_ID):
                 return
         except Exception as e:
             toast(str(e))

@@ -262,7 +262,7 @@ async def load_map(map_id):
     if state["map_loaded"] != map_id:
         state["map_loaded"] = map_id
         try:
-            if not await tmap.load(f"./plans/{map_id}.svg"):
+            if not await tmap.load(f"./plans/{map_id}.svg", locked=map_id == SITE_ID):
                 return
         except Exception as e:
             toast(str(e))
