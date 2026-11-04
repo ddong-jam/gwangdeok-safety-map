@@ -13,7 +13,7 @@ from common import now_iso
 SHARED = bool(config.SUPABASE_URL and config.SUPABASE_ANON_KEY)
 
 # 학생 화면에 보여줘도 되는 칸 (신고자 이름·사진·담당자는 선생님만)
-PUBLIC_FIELDS = ("id", "created_at", "map", "x", "y", "category", "severity", "title", "spot", "status")
+PUBLIC_FIELDS = ("id", "created_at", "map", "x", "y", "kind", "category", "severity", "title", "spot", "status")
 REPORT_FIELDS = PUBLIC_FIELDS + ("updated_at", "resolved_at", "description", "reporter", "photo", "assignee")
 
 

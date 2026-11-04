@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from js import Blob, Object, URL, document, window
 from pyodide.ffi import create_proxy, to_js
 
-from campus import CATEGORIES, SEVERITIES, STATUSES
+from campus import CATEGORIES, KINDS, SEVERITIES, STATUSES, kind_of
 
 KST = timezone(timedelta(hours=9))
 SEVERITY_DOTS = {"urgent": "🔴", "high": "🟠", "mid": "🟡", "low": "🔵"}
@@ -95,6 +95,12 @@ def status_badge(status):
 def severity_badge(sev):
     name, color = SEVERITIES.get(sev, (sev, "#94a3b8"))
     return f'<span class="sev-tag" style="--c:{color}">{esc(name)}</span>'
+
+
+def kind_badge(r):
+    k = kind_of(r)
+    name, icon, _ = KINDS[k]
+    return f'<span class="kind-tag kind-{k}">{icon} {esc(name)}</span>'
 
 
 def category_name(cat):

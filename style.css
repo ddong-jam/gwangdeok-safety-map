@@ -416,3 +416,22 @@ body.reporting .link { pointer-events: none; opacity: 0.5; }
 @media (max-width: 880px) {
   .search { width: 100%; }
 }
+
+/* ── v2.2.1 위험/불편 신고 ───────────── */
+.kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kinds label { position: relative; cursor: pointer; }
+.kinds input { position: absolute; opacity: 0; pointer-events: none; }
+.kinds span {
+  display: flex; flex-direction: column; gap: 2px; height: 100%;
+  padding: 10px 12px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper);
+}
+.kinds b { font-size: 16px; color: var(--ink); }
+.kinds small { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.kinds .kind-danger input:checked + span { border-color: var(--danger); background: #fef2f2; }
+.kinds .kind-incon input:checked + span { border-color: #7c3aed; background: #f5f3ff; }
+.kinds input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kind-tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; }
+.kind-tag.kind-danger { color: #b91c1c; background: #fee2e2; }
+.kind-tag.kind-incon { color: #6d28d9; background: #ede9fe; }
+#formDialog[data-kind="incon"] #formSubmit { background: #7c3aed; border-color: #7c3aed; }
+#formDialog[data-kind="incon"] #formSubmit:hover { background: #6d28d9; }

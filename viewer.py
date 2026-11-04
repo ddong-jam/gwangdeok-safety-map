@@ -7,7 +7,7 @@ from js import DOMPoint, ResizeObserver, document, window
 from pyodide.ffi import create_proxy
 from pyodide.http import pyfetch
 
-from campus import BUILDINGS, SEVERITIES
+from campus import BUILDINGS, KINDS, SEVERITIES, kind_of
 from common import esc, on
 
 NS = "http://www.w3.org/2000/svg"
@@ -262,7 +262,8 @@ class PlanViewer:
 
         for r in sorted(reports, key=order):
             done = r["status"] in ("done", "rejected")
-            color = SEVERITIES.get(r["severity"], ("", "#ca8a04"))[1]
+            # 불편 신고는 보라색, 위험 신고는 위험도 색
+            color = KINDS[kind_of(r)][2] or SEVERITIES.get(r["severity"], ("", "#ca8a04"))[1]
             g = el("g", cls="pin" + (" done" if done else "") + (" is-selected" if r["id"] == selected else ""))
             g.dataset.id = r["id"]
             g.dataset.x = r["x"]

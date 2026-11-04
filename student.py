@@ -4,9 +4,9 @@ import asyncio
 from js import window
 from pyodide.ffi import create_proxy
 
-from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, LINKS, SEVERITIES, SITE_ID, building_at,
-                    link_label, place_name, search)
-from common import (SEVERITY_DOTS, category_name, closest, esc, fmt_time, hide_loading, is_open, on, q, qa,
+from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, KINDS, LINKS, SEVERITIES, SITE_ID, building_at,
+                    kind_of, link_label, place_name, search)
+from common import (SEVERITY_DOTS, category_name, closest, esc, fmt_time, hide_loading, is_open, kind_badge, on, q, qa,
                     shrink_photo, status_badge, severity_badge, time_ago, toast)
 from store import SHARED, StoreError, store
 from viewer import PlanViewer
@@ -118,7 +118,7 @@ def render_chrome():
         q("#ctx").innerHTML = (
             '<h1>캠퍼스 평면도</h1><p class="sub">건물을 누르면 층별 평면도가 열려요.</p>'
             f'<div class="bld-grid">{"".join(cards)}</div>'
-            '<p class="hint">운동장·주차장 같은 야외 위험은 이 화면에서 <b>위험 신고</b>를 누르고 지도 위를 찍어주세요.</p>')
+            '<p class="hint">운동장·주차장 같은 야외의 위험·불편은 지도에서 건물 밖 그 자리를 누르면 바로 신고돼요.</p>')
     else:
         area = f'<span class="tag">바닥면적 {fl.area:,.2f}㎡</span>' if fl.area else ""
         tabs = "".join(f'<button role="tab" data-floor="{f.id}" aria-selected="{str(f.id == place).lower()}">{esc(f.name)}</button>'
@@ -129,7 +129,8 @@ def render_chrome():
             f'<p class="sub">{esc(sub)}</p>'
             f'<div class="meta"><span class="tag color" style="--c:{b.color}">{esc(b.code)}</span>{area}'
             f'<span class="tag">{len(b.floors)}개 층 도면</span></div>'
-            f'<div class="floor-list" role="tablist">{tabs}</div>')
+            f'<div class="floor-list" role="tablist">{tabs}</div>'
+            '<p class="hint">도면에서 <b>위험하거나 불편한 곳</b>을 누르면 그 자리에 바로 신고할 수 있어요.</p>')
 
 
 def draw_map():
@@ -154,16 +155,16 @@ def render_list():
     items = allr if place == SITE_ID else [r for r in allr if r["map"] == place]
     q("#listTitle").textContent = "전체 신고" if place == SITE_ID else "이 층의 신고"
     if not items:
-        q("#reportList").innerHTML = ('<li class="empty">아직 신고가 없어요.<br/>위험한 곳을 보면 '
-                                      '<b>위험 신고</b>를 눌러주세요.</li>')
+        q("#reportList").innerHTML = ('<li class="empty">아직 신고가 없어요.<br/>위험하거나 불편한 곳을 보면 '
+                                      '도면에서 그 자리를 눌러주세요.</li>')
         return
     rows = []
     for r in items[:60]:
-        dot = "✅" if not is_open(r) else SEVERITY_DOTS.get(r["severity"], "🟡")
+        dot = "✅" if not is_open(r) else "🟣" if kind_of(r) == "incon" else SEVERITY_DOTS.get(r["severity"], "🟡")
         sel = " is-selected" if r["id"] == state["selected"] else ""
         spot = f' · {esc(r["spot"])}' if r.get("spot") else ""
         rows.append(f'<li><button class="report-item{sel}" data-id="{r["id"]}" type="button">'
-                    f'<span class="sev-dot">{dot}</span><span class="t">{esc(r["title"])}</span>{status_badge(r["status"])}'
+                    f'<span class="sev-dot">{dot}</span><span class="t">{kind_badge(r)} {esc(r["title"])}</span>{status_badge(r["status"])}'
                     f'<span class="w">{esc(place_name(r["map"]))}{spot} · {time_ago(r["created_at"])}</span></button></li>')
     q("#reportList").innerHTML = "".join(rows)
 
@@ -187,18 +188,19 @@ def on_tap(x, y, target):
     if pin and state["mode"] != "report":
         open_detail(pin.dataset.id)
         return
-    if state["mode"] == "report":
-        w, h = viewer.size
-        if not (0 <= x <= w and 0 <= y <= h):
-            toast("도면 안쪽을 눌러주세요")
-            return
-        set_draft((x, y))
-        open_form()
-        return
-    if state["place"] == SITE_ID:
+    if state["place"] == SITE_ID and state["mode"] != "report":
         b = building_at(x, y)
         if b:
             go(b.id)
+            return
+    # 도면 안을 누르면 그 자리에 바로 위험/불편 신고 (배치도에서는 건물 밖 = 야외)
+    w, h = viewer.size
+    if not (0 <= x <= w and 0 <= y <= h):
+        if state["mode"] == "report":
+            toast("도면 안쪽을 눌러주세요")
+        return
+    set_draft((x, y))
+    open_form()
 
 
 viewer.on_tap = on_tap
@@ -211,11 +213,11 @@ def set_mode(mode):
     reporting = mode == "report"
     window.document.body.classList.toggle("reporting", reporting)
     q("#btnReport").setAttribute("aria-pressed", str(reporting).lower())
-    q("#btnReport span").textContent = "신고 취소" if reporting else "위험 신고"
+    q("#btnReport span").textContent = "신고 취소" if reporting else "위험/불편 신고"
     q("#modeBanner").hidden = not reporting
     q("#modeText").textContent = (
-        "지도에서 위험한 곳을 눌러주세요 (건물 안은 건물을 먼저 선택)" if state["place"] == SITE_ID
-        else f"{place_name(state['place'])} 도면에서 위험한 곳을 눌러주세요")
+        "지도에서 위험하거나 불편한 곳을 눌러주세요 (건물 안은 건물을 먼저 선택)" if state["place"] == SITE_ID
+        else f"{place_name(state['place'])} 도면에서 위험하거나 불편한 곳을 눌러주세요")
     if not reporting:
         set_draft(None)
 
@@ -249,8 +251,22 @@ q("#sevChips").innerHTML = "".join(
     for k, (n, c) in SEVERITIES.items())
 
 
+SEV_LEGEND = {"danger": "얼마나 위험한가요?", "incon": "얼마나 급한가요?"}
+
+
+def on_kind_change(e=None):
+    k = checked("kind") or "danger"
+    q("#sevLegend").textContent = SEV_LEGEND[k]
+    q("#formSubmit").textContent = f"{KINDS[k][0]} 신고 접수"
+    form_dialog.dataset.kind = k
+
+
+on(q("#kindChips"), "change", on_kind_change)
+
+
 def open_form():
     form.reset()
+    on_kind_change()
     state["photo"] = None
     q("#photoPreview").hidden = True
     q("#photoHint").textContent = "사진 추가 · 촬영"
@@ -309,7 +325,7 @@ async def on_submit(e):
     btn.disabled = True
     x, y = state["draft"]
     report = {
-        "map": state["place"], "x": round(x, 2), "y": round(y, 2),
+        "map": state["place"], "x": round(x, 2), "y": round(y, 2), "kind": checked("kind") or "danger",
         "category": checked("category") or "etc", "severity": checked("severity") or "mid",
         "title": field("title")[:60], "spot": field("spot")[:60], "description": field("desc")[:1000],
         "reporter": field("reporter")[:30], "photo": state["photo"],
@@ -327,7 +343,7 @@ async def on_submit(e):
     set_mode("browse")
     await refresh_reports()
     render_all()
-    toast("신고가 접수되었어요. 선생님이 확인할게요!")
+    toast(f"{KINDS[report['kind']][0]} 신고가 접수되었어요. 선생님이 확인할게요!")
 
 
 on(form, "submit", on_submit, prevent=True)
@@ -356,7 +372,7 @@ def open_detail(rid):
     spot = f'<dt>정확한 장소</dt><dd>{esc(r["spot"])}</dd>' if r.get("spot") else ""
     q("#detailBody").innerHTML = f"""
       <header class="sheet-head">
-        <div><p class="eyebrow">{severity_badge(r["severity"])} · {esc(category_name(r["category"]))}</p>
+        <div><p class="eyebrow">{kind_badge(r)} {severity_badge(r["severity"])} · {esc(category_name(r["category"]))}</p>
         <h2>{esc(r["title"])}</h2></div>
         <button class="icon-btn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
       </header>

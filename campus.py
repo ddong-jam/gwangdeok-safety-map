@@ -129,6 +129,18 @@ SEVERITIES = {  # id: (이름, 색)
     "low": ("낮음", "#2563eb"),
 }
 
+# 신고 종류: id: (이름, 표시, 핀 색) — 불편 신고는 위험도와 상관없이 보라색 핀
+KINDS = {
+    "danger": ("위험", "⚠️", None),
+    "incon": ("불편", "🙁", "#7c3aed"),
+}
+
+
+def kind_of(r: dict) -> str:
+    """신고 종류 (예전 신고에는 없으니 위험으로 본다)."""
+    return r.get("kind") if r.get("kind") in KINDS else "danger"
+
+
 STATUSES = {
     "new": "접수",
     "doing": "처리중",

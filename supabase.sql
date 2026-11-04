@@ -11,6 +11,7 @@ create table if not exists public.reports (
   map         text not null check (length(map) <= 20),
   x           real not null,
   y           real not null,
+  kind        text not null default 'danger' check (kind in ('danger','incon')),   -- 위험 / 불편
   category    text not null default 'etc' check (category in ('facility','slip','fire','traffic','hygiene','security','etc')),
   severity    text not null default 'mid' check (severity in ('urgent','high','mid','low')),
   title       text not null check (length(title) between 1 and 60),
@@ -23,6 +24,8 @@ create table if not exists public.reports (
   has_photo   boolean generated always as (photo is not null) stored
 );
 create index if not exists reports_created_idx on public.reports (created_at desc);
+-- v2.2.1 이전에 만든 데이터베이스에는 종류 칸을 더한다
+alter table public.reports add column if not exists kind text not null default 'danger' check (kind in ('danger','incon'));
 
 -- ── 처리 기록 ─────────────────────────────────────
 create table if not exists public.report_events (
@@ -53,7 +56,7 @@ alter table public.admins        enable row level security;   -- 정책 없음 =
 revoke all on public.reports, public.report_events, public.admins from anon, authenticated;
 
 -- 학생: 정해진 칸만 넣을 수 있다 (상태·담당자는 못 정함)
-grant insert (id, map, x, y, category, severity, title, spot, description, reporter, photo)
+grant insert (id, map, x, y, kind, category, severity, title, spot, description, reporter, photo)
   on public.reports to anon, authenticated;
 drop policy if exists "누구나 신고" on public.reports;
 create policy "누구나 신고" on public.reports for insert to anon, authenticated
@@ -78,7 +81,7 @@ create policy "선생님 기록 남기기" on public.report_events for insert to
 -- ── 학생에게 보이는 신고 (공개 칸만) ──────────────
 -- 뷰는 만든 사람 권한으로 돌아서 위 RLS 와 상관없이 이 칸들만 보여준다
 create or replace view public.public_reports as
-  select id, created_at, map, x, y, category, severity, title, spot, status
+  select id, created_at, map, x, y, category, severity, title, spot, status, kind   -- 새 칸은 맨 뒤에 (기존 뷰를 바꿀 수 있게)
   from public.reports;
 grant select on public.public_reports to anon, authenticated;
 

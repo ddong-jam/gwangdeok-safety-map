@@ -6,9 +6,10 @@ from datetime import datetime, timedelta, timezone
 
 from js import window
 
-from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, SEVERITIES, SITE_ID, STATUSES, building_of,
-                    place_name)
-from common import (KST, SEVERITY_DOTS, category_name, closest, download, esc, fmt_time, hide_loading, is_open, on,
+from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, KINDS, SEVERITIES, SITE_ID, STATUSES,
+                    building_of, kind_of, place_name)
+from common import (KST, SEVERITY_DOTS, category_name, closest, download, esc, fmt_time, hide_loading, is_open,
+                    kind_badge, on,
                     parse_time, q, qa, status_badge, severity_badge, time_ago, toast)
 from store import SHARED, StoreError, store
 from viewer import PlanViewer
@@ -168,7 +169,7 @@ def render_dash():
     hot = sorted((r for r in opened if r["severity"] in ("urgent", "high")), key=lambda r: r["created_at"])[:8]
     q("#hotList").innerHTML = "".join(
         f'<li><button class="report-item" data-id="{r["id"]}" type="button"><span class="sev-dot">{SEVERITY_DOTS[r["severity"]]}</span>'
-        f'<span class="t">{esc(r["title"])}</span>{status_badge(r["status"])}'
+        f'<span class="t">{kind_badge(r)} {esc(r["title"])}</span>{status_badge(r["status"])}'
         f'<span class="w">{esc(place_name(r["map"]))} · {time_ago(r["created_at"])}</span></button></li>'
         for r in hot) or '<li class="t-empty">없어요 👍</li>'
 
@@ -184,7 +185,7 @@ q("#fBuilding").innerHTML = '<option value="">전체</option><option value="site
 
 
 def filtered():
-    st, sev, bid = q("#fStatus").value, q("#fSeverity").value, q("#fBuilding").value
+    st, sev, bid, kind = q("#fStatus").value, q("#fSeverity").value, q("#fBuilding").value, q("#fKind").value
     text = str(q("#fSearch").value).strip().lower()
     out = []
     for r in state["rows"]:
@@ -193,6 +194,8 @@ def filtered():
         if st and st != "open" and r["status"] != st:
             continue
         if sev and r["severity"] != sev:
+            continue
+        if kind and kind_of(r) != kind:
             continue
         if bid == "site" and r["map"] != SITE_ID:
             continue
@@ -212,17 +215,17 @@ def filtered():
 def render_table():
     rows = filtered()
     q("#listCount").textContent = f"{len(rows)}건 · 줄을 누르면 자세한 내용과 처리 메뉴가 열려요"
-    head = "<thead><tr><th>접수</th><th>위험도</th><th>상태</th><th>제목</th><th>위치</th><th>장소</th><th>유형</th><th>담당</th><th>📷</th></tr></thead>"
+    head = "<thead><tr><th>접수</th><th>종류</th><th>위험도</th><th>상태</th><th>제목</th><th>위치</th><th>장소</th><th>유형</th><th>담당</th><th>📷</th></tr></thead>"
     body = "".join(
         f'<tr data-id="{r["id"]}" class="{"is-selected" if r["id"] == state["sel"] else ""}">'
-        f'<td>{parse_time(r["created_at"]).astimezone(KST):%m-%d %H:%M}</td><td>{severity_badge(r["severity"])}</td>'
+        f'<td>{parse_time(r["created_at"]).astimezone(KST):%m-%d %H:%M}</td><td>{kind_badge(r)}</td><td>{severity_badge(r["severity"])}</td>'
         f'<td>{status_badge(r["status"])}</td><td class="title">{esc(r["title"])}</td><td>{esc(place_name(r["map"]))}</td>'
         f'<td>{esc(r.get("spot") or "")}</td><td>{esc(category_name(r["category"]))}</td><td>{esc(r.get("assignee") or "")}</td>'
         f'<td>{"📷" if r.get("has_photo") else ""}</td></tr>' for r in rows)
-    q("#reportTable").innerHTML = head + f"<tbody>{body or '<tr><td colspan=9 class=t-empty>조건에 맞는 신고가 없어요</td></tr>'}</tbody>"
+    q("#reportTable").innerHTML = head + f"<tbody>{body or '<tr><td colspan=10 class=t-empty>조건에 맞는 신고가 없어요</td></tr>'}</tbody>"
 
 
-for sel in ("#fStatus", "#fSeverity", "#fBuilding"):
+for sel in ("#fStatus", "#fKind", "#fSeverity", "#fBuilding"):
     on(q(sel), "change", lambda e: render_table())
 on(q("#fSearch"), "input", lambda e: render_table())
 on(q("#reportTable"), "click", lambda e: open_detail(closest(e, "tr[data-id]").dataset.id) if closest(e, "tr[data-id]") else None)
@@ -231,14 +234,14 @@ on(q("#reportTable"), "click", lambda e: open_detail(closest(e, "tr[data-id]").d
 def export_csv(e):
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["접수일시", "위험도", "상태", "제목", "위치", "정확한 장소", "유형", "내용", "신고자", "담당자", "처리일시", "사진"])
+    w.writerow(["접수일시", "종류", "위험도", "상태", "제목", "위치", "정확한 장소", "유형", "내용", "신고자", "담당자", "처리일시", "사진"])
     for r in state["rows"]:
-        w.writerow([fmt_time(r["created_at"]), SEVERITIES.get(r["severity"], ("",))[0], STATUSES.get(r["status"], r["status"]),
+        w.writerow([fmt_time(r["created_at"]), KINDS[kind_of(r)][0], SEVERITIES.get(r["severity"], ("",))[0], STATUSES.get(r["status"], r["status"]),
                     r["title"], place_name(r["map"]), r.get("spot") or "", category_name(r["category"]),
                     r.get("description") or "", r.get("reporter") or "", r.get("assignee") or "",
                     fmt_time(r.get("resolved_at")) if r.get("resolved_at") else "", "있음" if r.get("has_photo") else ""])
     # ﻿: 엑셀에서 한글이 깨지지 않게
-    download(f"안전신고_{datetime.now(KST):%Y%m%d}.csv", "﻿" + buf.getvalue(), "text/csv")
+    download(f"위험불편신고_{datetime.now(KST):%Y%m%d}.csv", "﻿" + buf.getvalue(), "text/csv")
 
 
 on(q("#btnCsv"), "click", export_csv)
@@ -333,7 +336,7 @@ async def _open_detail(rid):
     render_table()
     if state["tab"] == "map":
         draw_map_pins()
-    q("#dHead").innerHTML = (f'<p class="eyebrow">{severity_badge(r["severity"])} · {esc(category_name(r["category"]))} · '
+    q("#dHead").innerHTML = (f'<p class="eyebrow">{kind_badge(r)} {severity_badge(r["severity"])} · {esc(category_name(r["category"]))} · '
                              f'{status_badge(r["status"])}</p><h2>{esc(r["title"])}</h2>')
     rows = [("위치", place_name(r["map"])), ("정확한 장소", r.get("spot")), ("신고자", r.get("reporter") or "익명"),
             ("신고 일시", fmt_time(r["created_at"])), ("담당자", r.get("assignee")),
