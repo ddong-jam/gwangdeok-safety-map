@@ -2,9 +2,10 @@
 import asyncio
 
 from js import window
+from pyodide.ffi import create_proxy
 
-from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, SEVERITIES, SITE_ID, building_at,
-                    place_name)
+from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, LINKS, SEVERITIES, SITE_ID, building_at,
+                    link_label, place_name, search)
 from common import (SEVERITY_DOTS, category_name, closest, esc, fmt_time, hide_loading, is_open, on, q, qa,
                     shrink_photo, status_badge, severity_badge, time_ago, toast)
 from store import SHARED, StoreError, store
@@ -19,6 +20,7 @@ state = {
     "reports": [],        # 학생에게 보여도 되는 신고 전체
     "mine": set(),        # 이 화면에서 내가 접수한 신고
     "photo": None,
+    "hit": None,          # 검색으로 찾은 곳 (x, y)
 }
 viewer = PlanViewer(q("#map"))
 
@@ -64,6 +66,8 @@ def go(place):
 async def navigate(place, after=None):
     changed = place != state["loaded"]
     state["place"] = place
+    if changed:
+        state["hit"] = None
     if state["mode"] == "report":
         set_draft(None)
         set_mode("report")
@@ -134,7 +138,8 @@ def draw_map():
         counts = {b.id: open_count(lambda r, b=b: r["map"] in floors_of(b)) for b in BUILDINGS}
         viewer.draw_buildings(counts)
     else:
-        viewer.clear_overlay()
+        viewer.draw_links([(x, y, t, link_label(t)) for x, y, t in LINKS.get(state["place"], [])])
+    viewer.draw_hit(state["hit"])
     viewer.draw_pins(here, state["selected"])
     viewer.draw_draft(state["draft"])
 
@@ -172,6 +177,13 @@ def render_all():
 # ── 지도 누르기 ───────────────────────────────────
 def on_tap(x, y, target):
     pin = target.closest(".pin") if hasattr(target, "closest") else None
+    link = target.closest(".link") if hasattr(target, "closest") else None
+    if state["hit"]:  # 검색 표시는 지도를 한 번 누르면 지운다
+        state["hit"] = None
+        viewer.draw_hit(None)
+    if link and state["mode"] != "report":
+        go(link.dataset.target)
+        return
     if pin and state["mode"] != "report":
         open_detail(pin.dataset.id)
         return
@@ -421,6 +433,87 @@ on(q("#zoomOut"), "click", lambda e: viewer.zoom_by(1 / 1.5))
 on(q("#zoomFit"), "click", lambda e: viewer.fit())
 
 on(window, "hashchange", lambda e: asyncio.ensure_future(navigate(parse_hash())))
+
+
+# ── 검색 (예: 2-1, 보건실, 409) ─────────────────────
+search_input = q("#searchInput")
+search_list = q("#searchResults")
+search_state = {"items": [], "active": 0}
+
+
+def show_results(items):
+    search_state["items"] = items
+    search_state["active"] = 0
+    if not search_input.value.strip():
+        search_list.hidden = True
+        return
+    if not items:
+        search_list.innerHTML = '<li class="empty">찾는 곳이 없어요. 예) 2-1, 보건실, 409</li>'
+    else:
+        search_list.innerHTML = "".join(
+            f'<li role="option" data-i="{i}" aria-selected="{str(i == 0).lower()}">'
+            f'<strong>{esc(r["title"])}</strong><small>{esc(r["sub"])}</small></li>'
+            for i, r in enumerate(items))
+    search_list.hidden = False
+
+
+def mark_active():
+    for li in qa("#searchResults li[data-i]"):
+        li.setAttribute("aria-selected", str(int(li.dataset.i) == search_state["active"]).lower())
+
+
+def jump_to(r):
+    search_list.hidden = True
+    search_input.blur()
+
+    def do_focus():
+        if r["x"] is not None:
+            state["hit"] = (r["x"], r["y"])
+            viewer.focus(r["x"], r["y"], min(viewer.size[0], 260))
+            viewer.draw_hit(state["hit"])
+            toast(f"{r['title']} · {r['sub']}")
+
+    if state["mode"] == "report":
+        set_mode("browse")
+    if r["floor"] != state["loaded"]:
+        window.history.replaceState(None, "", f"#{r['floor']}")
+        asyncio.ensure_future(navigate(r["floor"], do_focus))
+    else:
+        state["place"] = r["floor"]
+        do_focus()
+
+
+def on_search_key(e):
+    items = search_state["items"]
+    if e.key == "Enter":
+        e.preventDefault()
+        if not items:
+            show_results(search(search_input.value))
+            items = search_state["items"]
+        if items:
+            jump_to(items[search_state["active"]])
+    elif e.key in ("ArrowDown", "ArrowUp") and items:
+        e.preventDefault()
+        step = 1 if e.key == "ArrowDown" else -1
+        search_state["active"] = (search_state["active"] + step) % len(items)
+        mark_active()
+    elif e.key == "Escape":
+        search_input.value = ""
+        search_list.hidden = True
+
+
+def on_result_click(e):
+    li = closest(e, "li[data-i]")
+    if li:
+        jump_to(search_state["items"][int(li.dataset.i)])
+
+
+on(search_input, "input", lambda e: show_results(search(search_input.value)))
+on(search_input, "keydown", on_search_key)
+on(search_input, "focus", lambda e: show_results(search(search_input.value)))
+on(search_list, "pointerdown", lambda e: e.preventDefault())  # 누르는 동안 입력창 포커스 유지
+on(search_list, "click", on_result_click)
+on(search_input, "blur", lambda e: window.setTimeout(create_proxy(lambda: setattr(search_list, "hidden", True)), 150))
 
 
 # ── 시작 ─────────────────────────────────────────

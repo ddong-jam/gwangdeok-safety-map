@@ -2,6 +2,7 @@
 
 배치도 좌표는 plans/site.svg 의 단위(pt)이며 원본 전체배치도 PDF에서 추출했다.
 """
+import re
 from dataclasses import dataclass, field
 
 SITE_ID = "site"
@@ -85,6 +86,32 @@ BUILDINGS: list[Building] = [
 BUILDING_BY_ID = {b.id: b for b in BUILDINGS}
 FLOOR_INDEX = {f.id: (b, f) for b in BUILDINGS for f in b.floors}
 
+# ── 연결복도 버튼 ──────────────────────────────────
+# 층 도면 위 연결복도 자리에 버튼을 놓고, 누르면 이어진 건물의 같은 층으로 간다.
+# {층 id: [(x, y, 갈 층 id), ...]}  x, y 는 그 층 도면 좌표 (연결복도 글자 자리)
+LINKS = {
+    # 만대관: 왼쪽 끝 → 중학교, 오른쪽 끝 → 덕린관
+    "b1-1f": [(73, 124, "b4-1f"), (732, 115, "b2-1f")],
+    "b1-2f": [(73, 124, "b4-2f"), (732, 115, "b2-2f")],
+    "b1-3f": [(83, 131, "b4-3f"), (732, 108, "b2-3f")],
+    "b1-4f": [(75, 120, "b4-4f"), (732, 113, "b2-4f")],
+    # 덕린관: 아래 왼쪽 → 만대관, 2층 위쪽 → 단재관
+    "b2-1f": [(253, 222, "b1-1f")],
+    "b2-2f": [(254, 246, "b1-2f"), (760, 40, "b3-2f")],
+    "b2-3f": [(254, 222, "b1-3f")],
+    "b2-4f": [(254, 222, "b1-4f")],
+    # 단재관: 오른쪽 → 덕린관
+    "b3-1f": [(799, 142, "b2-1f")],
+    "b3-2f": [(799, 142, "b2-2f")],
+    # 중학교: "본관에 연결" → 만대관, 오른쪽 위 연결복도 → 복지관 연결통로
+    "b4-1f": [(113, 22, "b1-1f")],
+    "b4-2f": [(96, 22, "b1-2f"), (830, 55, "b6-l2")],
+    "b4-3f": [(96, 22, "b1-3f"), (826, 88, "b6-lr")],
+    "b4-4f": [(96, 22, "b1-4f")],
+    # 특별교실: 2층 연결복도 → 단재관
+    "b9-2f": [(938, 333, "b3-2f")],
+}
+
 CATEGORIES = {
     "facility": "🛠 시설 파손",
     "slip": "⚠️ 미끄럼·낙상",
@@ -147,3 +174,62 @@ def building_at(x: float, y: float, pad: float = 4.0) -> Building | None:
             if min(xs) - pad <= x <= max(xs) + pad and min(ys) - pad <= y <= max(ys) + pad:
                 return b
     return None
+
+
+def link_label(floor_id: str) -> str:
+    """연결복도 버튼 글자, 예: '덕린관 2층'."""
+    hit = FLOOR_INDEX.get(floor_id)
+    return f"{hit[0].name.removesuffix(' 교사')} {hit[1].name}" if hit else floor_id
+
+
+# ── 검색 ─────────────────────────────────────────
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", "", s).lower()
+
+
+def search(text: str, limit: int = 8) -> list[dict]:
+    """'2-1', '2학년 1반', '409', '보건실', '덕린관' 같은 말로 방·반·건물을 찾는다."""
+    from rooms import CLASSES, ROOMS
+
+    q = _norm(text)
+    if not q:
+        return []
+    m = re.fullmatch(r"(\d)학년(\d{1,2})반?", q) or re.fullmatch(r"(\d)[-.](\d{1,2})반?", q)
+    if m:
+        q = f"{m.group(1)}-{m.group(2)}"
+    q = q.removesuffix("호") if re.fullmatch(r"[bw]?\d{3}호", q) else q
+
+    found = []  # (순위, 결과)
+
+    def rank(*keys):
+        best = None
+        for i, k in enumerate(keys):
+            k = _norm(k)
+            if not k:
+                continue
+            r = 0 if k == q else 2 if k.startswith(q) else 4 if q in k else None
+            if r is not None:
+                r += min(i, 1)
+                best = r if best is None else min(best, r)
+        return best
+
+    for fid, cls, num, x, y in CLASSES:
+        r = rank(cls, num)
+        if r is not None:
+            found.append((r, {"floor": fid, "x": x, "y": y, "title": cls,
+                              "sub": place_name(fid) + (f" · {num}호" if num else "")}))
+    class_nums = {(fid, num) for fid, _, num, _, _ in CLASSES if num}
+    for fid, num, name, x, y in ROOMS:
+        if (fid, num) in class_nums:
+            continue  # 반 교실은 반 이름(예: 2-1 · 409호)으로 나온다
+        r = rank(num, name)
+        if r is not None:
+            found.append((r + 0.5, {"floor": fid, "x": x, "y": y, "title": f"{num} {name}".strip(),
+                                    "sub": place_name(fid)}))
+    for b in BUILDINGS:
+        r = rank(b.name, b.sub)
+        if r is not None and b.floors:
+            found.append((r + 0.2, {"floor": b.default_floor.id, "x": None, "y": None, "title": b.name,
+                                    "sub": "건물 · " + " · ".join(x for x in (b.dong, b.sub) if x)}))
+    found.sort(key=lambda t: t[0])
+    return [f for _, f in found[:limit]]

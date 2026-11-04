@@ -13,7 +13,7 @@ from common import esc, on
 NS = "http://www.w3.org/2000/svg"
 ROOM = 1.3       # 도면 크기의 130% 까지만 멀어지고, 그 밖으로는 끌고 갈 수 없다
 MAX_ZOOM = 10    # 가장 멀리 본 것보다 10배까지 가까이
-PLANS_VERSION = "2.1.5"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
+PLANS_VERSION = "2.2.0"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
 PIN_PATH = "M0 0C-1.6-5.4-11-9.6-11-18.5a11 11 0 0 1 22 0C11-9.6 1.6-5.4 0 0z"
 _svg_cache = {}
 
@@ -49,7 +49,7 @@ class PlanViewer:
         self._clip_rect = el("rect", {"x": 0, "y": 0, "width": 100, "height": 100})
         clip.appendChild(self._clip_rect)
         svg.appendChild(clip)
-        for name in ("plan", "overlay", "pins", "draft"):
+        for name in ("plan", "overlay", "mark", "pins", "draft"):
             g = el("g", cls=f"layer-{name}")
             svg.appendChild(g)
             self.layers[name] = g
@@ -247,7 +247,7 @@ class PlanViewer:
     def scale_markers(self):
         """핀과 이름표가 확대해도 화면에서 같은 크기로 보이게."""
         u = self.units_per_px
-        for g in document.querySelectorAll(".pin, .draft-pin, .bld-label"):
+        for g in document.querySelectorAll(".pin, .draft-pin, .bld-label, .link, .hit"):
             if self.svg.contains(g):
                 g.setAttribute("transform", f"translate({g.dataset.x} {g.dataset.y}) scale({u})")
 
@@ -320,3 +320,38 @@ class PlanViewer:
 
     def clear_overlay(self):
         self.layers["overlay"].innerHTML = ""
+
+    def draw_links(self, links):
+        """연결복도 버튼. links: [(x, y, 갈 층 id, 글자)]"""
+        layer = self.layers["overlay"]
+        layer.innerHTML = ""
+        W = self.size[0]
+        for x, y, target, label in links:
+            g = el("g", cls="link")
+            g.dataset.x, g.dataset.y = x, y
+            g.dataset.target = target
+            w = len(label) * 11.5 + 34
+            # 도면 가장자리 버튼은 안쪽으로 펼쳐서 화면 밖·층 버튼 뒤로 숨지 않게
+            side = "left" if x < W * 0.2 else "right" if x > W * 0.8 else "mid"
+            x0 = {"left": -8, "right": 8 - w, "mid": -w / 2}[side]
+            if side == "left":
+                arrow, tx = f'M{x0 + 19},-4l-5,4 5,4', x0 + w / 2 + 6
+            else:
+                arrow, tx = f'M{x0 + w - 19},-4l5,4-5,4', x0 + w / 2 - 6
+            g.innerHTML = (f'<rect x="{x0}" y="-13" width="{w}" height="26" rx="13"/>'
+                           f'<path class="arrow" d="{arrow}" />'
+                           f'<text x="{tx}" font-size="12">{esc(label)}</text>'
+                           f'<title>{esc(label)}(으)로 가기</title>')
+            layer.appendChild(g)
+        self.scale_markers()
+
+    def draw_hit(self, point):
+        """검색으로 찾은 곳을 잠깐 동그라미로 알려준다."""
+        layer = self.layers["mark"]
+        layer.innerHTML = ""
+        if point:
+            g = el("g", cls="hit")
+            g.dataset.x, g.dataset.y = point
+            g.innerHTML = '<circle class="wave" r="26"/><circle class="ring" r="26"/>'
+            layer.appendChild(g)
+        self.scale_markers()

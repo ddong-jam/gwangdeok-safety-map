@@ -379,3 +379,40 @@ body.teacher { overflow: auto; background: var(--bg); }
   .t-grid2, .t-detail, .t-actions { grid-template-columns: 1fr; }
   .who { display: none; }
 }
+
+/* ── v2.2 연결복도 버튼 · 검색 ───────────── */
+.link { cursor: pointer; }
+.link rect { fill: var(--accent); stroke: #fff; stroke-width: 2; filter: drop-shadow(0 2px 4px rgb(15 23 42 / 0.25)); }
+.link text { fill: #fff; font-weight: 700; text-anchor: middle; dominant-baseline: central; letter-spacing: -0.02em; }
+.link .arrow { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.link:hover rect { fill: #1d4ed8; }
+body.reporting .link { pointer-events: none; opacity: 0.5; }
+
+.hit { pointer-events: none; }
+.hit .ring { fill: rgb(37 99 235 / 0.12); stroke: var(--accent); stroke-width: 3; }
+.hit .wave { fill: none; stroke: var(--accent); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: hit-wave 1.4s ease-out 3; opacity: 0; }
+@keyframes hit-wave { from { transform: scale(0.6); opacity: 0.9; } to { transform: scale(1.9); opacity: 0; } }
+
+.stage-top { flex-wrap: wrap; align-items: flex-start; }
+.search {
+  pointer-events: auto; position: relative;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--paper); border-radius: 999px; padding: 0 12px; height: 40px; box-shadow: var(--shadow);
+  width: 230px; max-width: 100%;
+}
+.search > svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+.search input { border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); width: 100%; min-width: 0; }
+.search:focus-within { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; width: max(100%, 260px); margin: 0; padding: 6px; list-style: none;
+  background: var(--paper); border-radius: 12px; box-shadow: var(--shadow); max-height: 50vh; overflow-y: auto; z-index: 5;
+}
+.search-results li { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.search-results li strong { font-size: 15px; color: var(--ink); }
+.search-results li small { font-size: 12.5px; color: var(--muted); }
+.search-results li[aria-selected="true"], .search-results li:hover { background: #eff6ff; }
+.search-results .empty { cursor: default; color: var(--muted); font-size: 14px; }
+.search-results .empty:hover { background: none; }
+@media (max-width: 880px) {
+  .search { width: 100%; }
+}
