@@ -125,6 +125,7 @@ def render_chrome():
                        for f in b.floors)
         sub = " · ".join(x for x in (b.sub, b.dong) if x)
         q("#ctx").innerHTML = (
+            '<a class="back-btn" href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>캠퍼스로 돌아가기</a>'
             f'<h1>{esc(b.name)} <span style="color:var(--muted);font-weight:600">{esc(fl.name)}</span></h1>'
             f'<p class="sub">{esc(sub)}</p>'
             f'<div class="meta"><span class="tag color" style="--c:{b.color}">{esc(b.code)}</span>{area}'

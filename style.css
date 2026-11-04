@@ -435,3 +435,12 @@ body.reporting .link { pointer-events: none; opacity: 0.5; }
 .kind-tag.kind-incon { color: #6d28d9; background: #ede9fe; }
 #formDialog[data-kind="incon"] #formSubmit { background: #7c3aed; border-color: #7c3aed; }
 #formDialog[data-kind="incon"] #formSubmit:hover { background: #6d28d9; }
+
+/* ── v2.2.2 오른쪽 패널 뒤로 가기 ───────────── */
+.back-btn {
+  display: inline-flex; align-items: center; gap: 4px; margin-bottom: 10px;
+  padding: 7px 14px 7px 10px; border-radius: 999px; background: #f1f5f9; color: var(--ink);
+  font-size: 14px; font-weight: 700; text-decoration: none;
+}
+.back-btn:hover { background: #e2e8f0; }
+.back-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
