@@ -262,6 +262,7 @@ class Label:
         x0, y0, x1, y1 = bbox([p for ps, _ in rows for p in ps])
         self.c = ((x0 + x1) / 2, (y0 + y1) / 2)
         self.to = None
+        self.boxed = False
         self.layout = [(ps, col, 0.0, 0.0) for ps, col in rows]   # 줄마다 (조각, 색, dx, dy)
 
     def size(self):
@@ -296,14 +297,14 @@ class Label:
         return box(cx - w / 2 - margin, cy - h / 2 - margin, cx + w / 2 + margin, cy + h / 2 + margin)
 
     def svg(self):
-        k, (cx, cy) = self.k, self.c
+        k, (cx, cy) = round(self.k, 3), self.c  # 배율은 반올림한 값으로 위치도 계산해야 글자가 제자리에 온다
         nx, ny = self.to or self.c
         out = []
         for ps, col, dx, dy in self.layout:
             tx, ty = nx + k * (dx - cx), ny + k * (dy - cy)
             d = "".join(p[4] for p in ps)
             out.append(f'<path class="t" fill="{col}" stroke="{col}" stroke-width="{fmt(TEXT_BOLD / k)}" '
-                       f'stroke-linejoin="round" transform="matrix({fmt(k)} 0 0 {fmt(k)} {fmt(tx)} {fmt(ty)})" d="{d}"/>')
+                       f'stroke-linejoin="round" transform="matrix({k:g} 0 0 {k:g} {fmt(tx)} {fmt(ty)})" d="{d}"/>')
         return "".join(out)
 
 
@@ -320,14 +321,41 @@ def room_width(regions, x, y):
     return None
 
 
+def room_height(regions, x, y):
+    """(x, y) 가 들어 있는 방에서 그 자리의 세로 높이."""
+    pt = Point(x, y)
+    for r in regions:
+        if r.contains(pt):
+            _, miny, _, maxy = r.bounds
+            seg = LineString([(x, miny - 1), (x, maxy + 1)]).intersection(r)
+            for part in getattr(seg, "geoms", [seg]):
+                if part.length and part.distance(pt) < 1e-6:
+                    return part.length
+    return None
+
+
 def fit(label, regions):
-    """방보다 넓으면 두 줄로 나누고, 그래도 넓으면 조금 줄인다 (원래 크기보다 작게는 안 함)."""
+    """방보다 넓으면 두 줄로 나누고, 그래도 넓으면 조금 줄인다 (원래 크기보다 작게는 안 함).
+    - 짧은 글자(116 같은 번호, 두 글자 이름)는 세로로 긴 방이 아니면 나누지 않는다.
+    - 한 줄짜리 납작한 칸(샤워.탈의실 같은 이름표 상자)은 두 줄이 들어가지 않으니 나누지 않고 상자에 맞춘다."""
     room = room_width(regions, *label.c)
     if not room:
         return
     limit = room * 0.9
+    tall = room_height(regions, *label.c)
     if label.size()[0] > limit:
-        label.wrap()
+        x0, y0, x1, y1 = bbox([p for ps, _ in label.rows for p in ps])
+        one_row = len(label.rows) == 1
+        if one_row and tall and tall < 2.2 * (y1 - y0):
+            # 납작한 이름표 상자: 한 줄 그대로, 상자에 맞게만 키운다 (원래 크기보다 작게는 안 함)
+            label.k = max(1.0, min(limit / (x1 - x0), tall * 0.9 / (y1 - y0)))
+            label.boxed = True  # 상자 안 이름표는 옮기지 않는다
+            return
+        # 나눌 줄(가장 넓은 줄)이 짧으면(116, 창 고) 세로로 긴 방에서만 나눈다 (창/고)
+        rx0, ry0, rx1, ry1 = max((bbox(ps) for ps, _ in label.rows), key=lambda b: b[2] - b[0])
+        short = (rx1 - rx0) < 2.5 * (ry1 - ry0)
+        if not (short and (tall or 0) < 3 * (ry1 - ry0)):
+            label.wrap()
     w = label.size()[0]
     if w > limit:
         label.k = max(1.0, label.k * limit / w)
@@ -376,7 +404,7 @@ def text_layer(tags, floor_id, regions, obstacles, W, H):
         elif max(r["y1"] - r["y0"] for r in rs) >= MIN_LABEL_H:
             lab = Label([(r["p"], TEXT) for r in rs], LABEL_SCALE)
             fit(lab, regions)
-            (toilets if is_toilet_label(rs) else labels).append(lab)
+            (toilets if is_toilet_label(rs) and not lab.boxed else labels).append(lab)
         else:
             small += block
 
