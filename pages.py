@@ -66,6 +66,7 @@ STUDENT = '''
         <div>
           <p class="eyebrow" id="formWhere">위치</p>
           <h2>위험/불편 신고</h2>
+          <p class="who-line" id="formWho" hidden></p>
         </div>
         <button class="icon-btn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
       </header>
@@ -92,12 +93,47 @@ STUDENT = '''
         </div>
         <label class="field"><span>이름 (선택)</span>
           <input name="reporter" maxlength="30" placeholder="비워두면 익명으로 접수돼요" /></label>
+        <div class="notice">
+          <b>📢 신고 전에 꼭 읽어 주세요</b>
+          <ul>
+            <li>내가 직접 본 위험·불편만 사실대로 신고해요.</li>
+            <li id="noticeRecord">신고하면 시간과 이 기기 정보가 함께 기록돼요. (익명이어도 기록돼요)</li>
+            <li>장난·허위 신고는 선생님이 반려하고 이 기기의 신고를 막을 수 있으며, 학교 생활지도를 받을 수 있어요.</li>
+            <li>급하게 다칠 것 같은 일은 신고하고 바로 가까운 선생님께도 말씀드려요.</li>
+          </ul>
+          <label class="check"><input type="checkbox" name="pledge" required /><span><b>사실대로 신고합니다</b></span></label>
+        </div>
       </div>
       <footer class="sheet-foot">
         <button class="btn btn-quiet" type="button" data-close>취소</button>
         <button class="btn btn-danger" type="submit" id="formSubmit">신고 접수</button>
       </footer>
     </form>
+  </dialog>
+
+  <!-- 학생 로그인 (신고할 때만) -->
+  <dialog class="sheet" id="loginDialog">
+    <header class="sheet-head">
+      <div>
+        <p class="eyebrow">위험/불편 신고</p>
+        <h2>학교 구글 계정으로 로그인</h2>
+      </div>
+      <button class="icon-btn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+    </header>
+    <div class="sheet-body">
+      <p class="login-lead">장난 신고를 막으려고 <b>신고할 때만</b> 로그인해요. 지도와 다른 신고 보기는 로그인 없이 돼요.</p>
+      <ul class="login-points">
+        <li>누가 신고했는지는 <b>선생님만</b> 볼 수 있어요. 다른 학생에게는 보이지 않아요.</li>
+        <li>이 기기에서는 30일 동안 로그인이 유지돼요. 함께 쓰는 컴퓨터라면 신고 뒤 꼭 로그아웃해요.</li>
+        <li id="loginDomain" hidden></li>
+      </ul>
+      <label class="field" id="demoNameField" hidden><span>이름 (체험 모드)</span>
+        <input id="demoName" maxlength="30" placeholder="체험 모드라 구글 대신 이름만 넣어요" /></label>
+      <button class="btn btn-google" id="btnGoogle" type="button">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.3.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
+        <span>Google 계정으로 로그인</span>
+      </button>
+    </div>
   </dialog>
 
   <!-- 신고 보기 -->
@@ -132,6 +168,7 @@ TEACHER = '''
         <label class="field"><span>이메일</span><input name="email" type="email" autocomplete="username" /></label>
         <label class="field"><span>비밀번호</span><input name="password" type="password" autocomplete="current-password" /></label>
       </div>
+      <label class="check"><input type="checkbox" name="keep" /><span><b>이 기기에서 로그인 유지 (14일)</b><small>내 업무용 컴퓨터에서만 체크하세요. 여러 사람이 쓰는 컴퓨터에서는 체크하지 마세요.</small></span></label>
       <p class="t-error" id="loginError" hidden></p>
       <button class="btn btn-primary" type="submit">들어가기</button>
     </form>
@@ -212,6 +249,7 @@ TEACHER = '''
         <div>
           <h4>처리 기록</h4>
           <ul class="t-events" id="dEvents"></ul>
+          <div class="t-abuse" id="dAbuse"></div>
           <button class="btn-text-danger" id="dDelete" type="button">🗑️ 신고 삭제</button>
         </div>
       </div>

@@ -8,7 +8,7 @@
 import subprocess
 import sys
 
-SQL = '''-- 광덕 안전지도 · 공용 모드 데이터베이스 (Supabase → SQL Editor 에 통째로 붙여넣고 Run)
+SQL = r'''-- 광덕 안전지도 · 공용 모드 데이터베이스 (Supabase → SQL Editor 에 통째로 붙여넣고 Run)
 -- 학생(로그인 없음): 신고 접수 + 공개 칸만 보기 (신고자 이름·사진·담당자는 못 봄)
 -- 선생님(admins 에 등록된 계정): 모든 신고 보기 · 처리 · 삭제
 
@@ -66,7 +66,11 @@ alter table public.admins        enable row level security;   -- 정책 없음 =
 revoke all on public.reports, public.report_events, public.admins from anon, authenticated;
 
 -- 학생: 정해진 칸만 넣을 수 있다 (상태·담당자는 못 정함)
-grant insert (id, map, x, y, kind, category, severity, title, spot, description, reporter, photo)
+alter table public.reports add column if not exists device text check (length(device) between 8 and 40);   -- v2.5.0
+-- 신고한 학생의 구글 계정 (데이터베이스가 로그인 정보로 채운다 — 화면에서 보낼 수 없다)
+alter table public.reports add column if not exists reporter_uid uuid;
+alter table public.reports add column if not exists reporter_email text check (length(reporter_email) <= 120);
+grant insert (id, map, x, y, kind, category, severity, title, spot, description, reporter, photo, device)
   on public.reports to anon, authenticated;
 drop policy if exists "누구나 신고" on public.reports;
 create policy "누구나 신고" on public.reports for insert to anon, authenticated
@@ -88,6 +92,81 @@ drop policy if exists "선생님 기록 남기기" on public.report_events;
 create policy "선생님 기록 보기" on public.report_events for select to authenticated using (public.is_admin());
 create policy "선생님 기록 남기기" on public.report_events for insert to authenticated with check (public.is_admin());
 
+-- ── 장난 신고 막기 (v2.5.0) ───────────────────────
+-- 기기 = 학생 브라우저가 만든 무작위 번호 (이름·IP 아님). 선생님이 장난 신고를 한 기기를 막을 수 있다.
+create table if not exists public.blocked_devices (
+  device     text primary key check (length(device) between 8 and 40),
+  reason     text check (length(reason) <= 100),
+  blocked_by text check (length(blocked_by) <= 30),
+  created_at timestamptz not null default now()
+);
+alter table public.blocked_devices enable row level security;
+revoke all on public.blocked_devices from anon, authenticated;
+grant select, insert, delete on public.blocked_devices to authenticated;
+drop policy if exists "선생님 차단 보기" on public.blocked_devices;
+drop policy if exists "선생님 차단" on public.blocked_devices;
+drop policy if exists "선생님 차단 풀기" on public.blocked_devices;
+create policy "선생님 차단 보기" on public.blocked_devices for select to authenticated using (public.is_admin());
+create policy "선생님 차단" on public.blocked_devices for insert to authenticated with check (public.is_admin());
+create policy "선생님 차단 풀기" on public.blocked_devices for delete to authenticated using (public.is_admin());
+
+-- 신고가 들어올 때마다 확인한다 (학생 화면의 확인을 건너뛰고 직접 보내도 여기서 막힌다). 기준은 guard.py 와 같다.
+create or replace function public.check_report() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  who_uid   uuid := auth.uid();
+  who_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  provider  text := coalesce(auth.jwt() -> 'app_metadata' ->> 'provider', '');
+  t   text := regexp_replace(lower(coalesce(new.title, '')), '\s', '', 'g');
+  all_text text := regexp_replace(lower(coalesce(new.title, '') || coalesce(new.description, '') ||
+                                        coalesce(new.spot, '') || coalesce(new.reporter, '')), '\s', '', 'g');
+begin
+  -- 학생 구글 로그인 (config.py 의 STUDENT_LOGIN · SCHOOL_EMAIL_DOMAIN)
+  new.reporter_uid := who_uid;
+  new.reporter_email := nullif(who_email, '');
+  if {require_login} and not public.is_admin() then
+    if who_uid is null or provider <> 'google' then
+      raise exception '신고: {MSG_login}';
+    end if;
+  end if;
+  if '{domain}' <> '' and who_uid is not null and not public.is_admin() and who_email not like '%@{domain}' then
+    raise exception '신고: {MSG_domain}';
+  end if;
+  if new.device is null then
+    raise exception '신고: {MSG_device}';
+  end if;
+  if exists (select 1 from public.blocked_devices b where b.device = new.device or b.device = who_uid::text) then
+    raise exception '신고: {MSG_blocked}';
+  end if;
+  if length(t) < 4 or t ~ '{REPEAT}'
+     or length(regexp_replace(t, '[^가-힣a-z0-9]', '', 'g')) < 3 then
+    raise exception '신고: {MSG_title}';
+  end if;
+  if all_text ~ '{BAD}' then
+    raise exception '신고: {MSG_bad}';
+  end if;
+  if (select count(*) from public.reports r where (case when who_uid is not null then r.reporter_uid = who_uid else r.device = new.device end)
+        and r.created_at > now() - interval '10 minutes') >= {per_10min} then
+    raise exception '신고: {MSG_per_10min}';
+  end if;
+  if (select count(*) from public.reports r where (case when who_uid is not null then r.reporter_uid = who_uid else r.device = new.device end)
+        and r.created_at > now() - interval '1 day') >= {per_day} then
+    raise exception '신고: {MSG_per_day}';
+  end if;
+  if (select count(*) from public.reports r where r.created_at > now() - interval '10 minutes') >= {all_per_10min} then
+    raise exception '신고: {MSG_all_per_10min}';
+  end if;
+  if exists (select 1 from public.reports r where (case when who_uid is not null then r.reporter_uid = who_uid else r.device = new.device end) and r.map = new.map
+               and r.created_at > now() - interval '{dup_minutes} minutes'
+               and sqrt(power(r.x - new.x, 2) + power(r.y - new.y, 2)) < {dup_dist}) then
+    raise exception '신고: {MSG_dup}';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists check_report on public.reports;
+create trigger check_report before insert on public.reports for each row execute function public.check_report();
+
 -- ── 학생에게 보이는 신고 (공개 칸만) ──────────────
 -- 뷰는 만든 사람 권한으로 돌아서 위 RLS 와 상관없이 이 칸들만 보여준다
 create or replace view public.public_reports as
@@ -102,13 +181,34 @@ grant select on public.public_reports to anon, authenticated;
 '''
 
 
+def build_sql():
+    """장난 신고 기준(guard.py)을 SQL 안에 채워 넣는다."""
+    import os
+    import re
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import guard
+    sql = SQL.replace("{REPEAT}", guard.REPEAT).replace("{BAD}", "|".join(re.escape(w) for w in guard.BAD_WORDS))
+    import config
+    domain = (getattr(config, "SCHOOL_EMAIL_DOMAIN", "") or "").strip().lstrip("@").lower()
+    assert re.fullmatch(r"[a-z0-9.-]*", domain), "SCHOOL_EMAIL_DOMAIN 에 이상한 글자가 있어요"
+    sql = sql.replace("{require_login}", "true" if getattr(config, "STUDENT_LOGIN", False) else "false")
+    sql = sql.replace("{domain}", domain)
+    for k, v in guard.LIMITS.items():
+        sql = sql.replace("{" + k + "}", str(v))
+    for k, v in guard.MESSAGES.items():
+        sql = sql.replace("{MSG_" + k + "}", v.replace("'", "''"))
+    assert "{" not in re.sub(r"\{\d+,?\d*\}", "", sql.split("as $$", 1)[1].split("$$;", 1)[0]), "빠진 값"
+    return sql
+
+
 def main():
+    sql = build_sql()
     if "--copy" in sys.argv:
-        subprocess.run("clip", input=SQL.encode("utf-16-le"), check=True)
+        subprocess.run("clip", input=sql.encode("utf-16-le"), check=True)
         print("복사했어요. Supabase → SQL Editor 에 붙여넣고 Run 하세요.")
     else:
         sys.stdout.reconfigure(encoding="utf-8")
-        print(SQL)
+        print(sql)
 
 
 if __name__ == "__main__":

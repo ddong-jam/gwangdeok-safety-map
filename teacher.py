@@ -18,7 +18,10 @@ from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, KINDS, S
 from common import (KST, SEVERITY_DOTS, category_name, closest, download, esc, fmt_time, hide_loading, is_open,
                     kind_badge, on,
                     parse_time, q, qa, status_badge, severity_badge, time_ago, toast)
+import config
 from store import SHARED, StoreError, store
+import json
+import time
 from viewer import PlanViewer
 
 NAME_KEY = "kd-safety-teacher-name"
@@ -26,8 +29,32 @@ state = {"rows": [], "sel": None, "detail": None, "tab": "dash", "map": SITE_ID,
          "new_status": None}
 
 
+FAIL_KEY = "kd-safety-login-fails"
+MAX_FAILS, LOCK_SEC = 5, 180   # 비밀번호를 5번 틀리면 3분 동안 못 넣는다
+
+
 def who():
-    return window.sessionStorage.getItem(NAME_KEY) or ""
+    return window.sessionStorage.getItem(NAME_KEY) or window.localStorage.getItem(NAME_KEY) or ""
+
+
+def _fails():
+    try:
+        return json.loads(window.localStorage.getItem(FAIL_KEY) or "{}")
+    except Exception:
+        return {}
+
+
+def locked_for():
+    """비밀번호를 여러 번 틀려서 잠긴 남은 초 (0 이면 안 잠김)."""
+    return max(0, int(_fails().get("until", 0) - time.time()))
+
+
+def note_fail():
+    f = _fails()
+    n = f.get("n", 0) + 1
+    f = {"n": 0, "until": time.time() + LOCK_SEC} if n >= MAX_FAILS else {"n": n, "until": 0}
+    window.localStorage.setItem(FAIL_KEY, json.dumps(f))
+    return MAX_FAILS - n if n < MAX_FAILS else 0
 
 
 def building_name(map_id):
@@ -56,7 +83,11 @@ def show_login():
     q("#btnLogout").hidden = True
     q("#who").textContent = ""
     q("#loginShared").hidden = not SHARED
-    q("#loginNote").textContent = ("학교에서 받은 선생님 계정으로 로그인하세요." if SHARED
+    shared_account = bool(getattr(config, "TEACHER_EMAIL", ""))
+    email = q("#loginForm").elements.namedItem("email")
+    email.closest(".field").hidden = shared_account
+    q("#loginNote").textContent = ("선생님 비밀번호를 넣으세요." if SHARED and shared_account
+                                   else "학교에서 받은 선생님 계정으로 로그인하세요." if SHARED
                                    else "체험 모드예요. 이름만 적고 들어가면 돼요.")
 
 
@@ -65,20 +96,45 @@ async def on_login(e):
     name = str(f.namedItem("name").value).strip()
     if not name:
         return
+    keep = bool(f.namedItem("keep").checked)
+    err = q("#loginError")
     if SHARED:
-        ok = await store.login(str(f.namedItem("email").value).strip(), str(f.namedItem("password").value))
-        if not ok:
-            err = q("#loginError")
-            err.textContent = "이메일 또는 비밀번호가 맞지 않아요."
+        wait = locked_for()
+        if wait:
+            err.textContent = f"비밀번호를 여러 번 틀렸어요. {wait // 60}분 {wait % 60}초 뒤에 다시 해 주세요."
             err.hidden = False
             return
-    window.sessionStorage.setItem(NAME_KEY, name[:30])
+        btn = q("#loginForm button[type=submit]")
+        btn.disabled = True
+        email = getattr(config, "TEACHER_EMAIL", "") or str(f.namedItem("email").value).strip()
+        try:
+            ok = await store.login(email, str(f.namedItem("password").value), keep)
+        except Exception:
+            ok = None
+        btn.disabled = False
+        f.namedItem("password").value = ""
+        if not ok:
+            if ok is None:
+                err.textContent = "서버에 연결하지 못했어요. 인터넷을 확인해 주세요."
+            else:
+                left = note_fail()
+                what = "비밀번호가" if getattr(config, "TEACHER_EMAIL", "") else "이메일 또는 비밀번호가"
+                err.textContent = (f"{what} 맞지 않아요. ({left}번 더 틀리면 3분 동안 잠겨요)" if left
+                                   else "비밀번호를 여러 번 틀렸어요. 3분 뒤에 다시 해 주세요.")
+            err.hidden = False
+            return
+        window.localStorage.removeItem(FAIL_KEY)
+    err.hidden = True
+    window.sessionStorage.removeItem(NAME_KEY)
+    window.localStorage.removeItem(NAME_KEY)
+    (window.localStorage if keep else window.sessionStorage).setItem(NAME_KEY, name[:30])
     await enter()
 
 
 def on_logout(e):
     store.logout()
     window.sessionStorage.removeItem(NAME_KEY)
+    window.localStorage.removeItem(NAME_KEY)
     show_login()
 
 
@@ -345,7 +401,8 @@ async def _open_detail(rid):
         draw_map_pins()
     q("#dHead").innerHTML = (f'<p class="eyebrow">{kind_badge(r)} {severity_badge(r["severity"])} · {esc(category_name(r["category"]))} · '
                              f'{status_badge(r["status"])}</p><h2>{esc(r["title"])}</h2>')
-    rows = [("위치", place_name(r["map"])), ("정확한 장소", r.get("spot")), ("신고자", r.get("reporter") or "익명"),
+    rows = [("위치", place_name(r["map"])), ("정확한 장소", r.get("spot")), ("신고자", r.get("reporter") or "이름 안 적음"),
+            ("구글 계정", r.get("reporter_email")),
             ("신고 일시", fmt_time(r["created_at"])), ("담당자", r.get("assignee")),
             ("처리 일시", fmt_time(r["resolved_at"]) if r.get("resolved_at") else None)]
     info = "".join(f"<dt>{k}</dt><dd>{esc(v)}</dd>" for k, v in rows if v)
@@ -360,6 +417,7 @@ async def _open_detail(rid):
         b.setAttribute("aria-pressed", str(b.dataset.v == r["status"]).lower())
     q("#dStatusSave").disabled = True
     await render_events(rid)
+    await render_abuse(r)
     if not dlg.open:
         dlg.showModal()
     # 작은 지도: 신고 위치를 확대해서 보여준다
@@ -374,6 +432,63 @@ async def render_events(rid):
     q("#dEvents").innerHTML = "".join(
         f'<li><b>{icons.get(e["kind"], "•")} {esc(e["body"])}</b><span>{esc(e["actor"])} · {fmt_time(e["created_at"])}</span></li>'
         for e in (evs if isinstance(evs, list) else [])) or '<li class="t-empty">아직 기록이 없어요</li>'
+
+
+def abuse_key(r):
+    """장난 신고를 막을 대상: 구글 계정으로 신고했으면 그 계정, 아니면 기기."""
+    if r.get("reporter_uid"):
+        return "reporter_uid", r["reporter_uid"]
+    return "device", r.get("device")
+
+
+async def render_abuse(r):
+    """장난 신고 막기: 같은 기기에서 온 신고 수, 차단 상태, 차단/해제 버튼."""
+    box = q("#dAbuse")
+    key, dev = abuse_key(r)
+    if not dev:
+        box.innerHTML = ""
+        return
+    same = [x for x in state["rows"] if x.get(key) == dev]
+    rejected = sum(1 for x in same if x["status"] == "rejected")
+    blocked = await safe(store.is_blocked(dev))
+    blocked = blocked is True
+    state["blocked"] = blocked
+    who_txt = "이 계정" if key == "reporter_uid" else "이 기기"
+    info = f"{who_txt}으로 온 신고 {len(same)}건" + (f" · 반려 {rejected}건" if rejected else "")
+    btn = (f'<button class="btn btn-quiet" type="button" data-abuse="unblock">✅ {who_txt} 차단 풀기</button>' if blocked else
+           f'<button class="btn-text-danger" type="button" data-abuse="block">🚫 장난 신고로 반려 + {who_txt} 신고 막기</button>')
+    box.innerHTML = (f'<h4>장난 신고 막기</h4><p class="t-count">{esc(info)} · '
+                     f'{"<b class=blocked>차단됨</b>" if blocked else "정상"}</p>{btn}')
+
+
+async def on_abuse(e):
+    b = closest(e, "button[data-abuse]")
+    r = state["detail"]
+    if not b or not r:
+        return
+    key, target = abuse_key(r)
+    if not target:
+        return
+    who_txt = "이 계정" if key == "reporter_uid" else "이 기기"
+    if b.dataset.abuse == "block":
+        tip = ("" if key == "reporter_uid" else
+               "\n(기기 차단은 브라우저 기록을 지우면 풀려서, 생활지도와 함께 쓰세요)")
+        if not window.confirm(f"이 신고를 '장난 신고'로 반려하고, {who_txt}으로 더는 신고하지 못하게 막을까요?{tip}"):
+            return
+        if r["status"] != "rejected":
+            await safe(store.update(r["id"], {"status": "rejected",
+                                              "resolved_at": datetime.now(timezone.utc).isoformat()}))
+        reason = f"장난 신고: {r['title'][:40]}" + (f" ({r['reporter_email']})" if r.get("reporter_email") else "")
+        if await safe(store.block(target, reason[:100], who())):
+            await safe(store.add_event(r["id"], "status", f"장난 신고로 반려 · {who_txt} 신고 막음", who()),
+                       f"반려하고 {who_txt}의 신고를 막았어요")
+    else:
+        if not window.confirm(f"{who_txt}의 신고 막기를 풀까요?"):
+            return
+        if await safe(store.unblock(target)):
+            await safe(store.add_event(r["id"], "memo", f"{who_txt} 신고 막기를 풀었어요", who()), "차단을 풀었어요")
+    await reload()
+    await _open_detail(r["id"])
 
 
 def on_status_pick(e):
@@ -434,6 +549,7 @@ on(q("#dStatusSave"), "click", on_status_save)
 on(q("#dAssigneeSave"), "click", on_assignee_save)
 on(q("#dMemoSave"), "click", on_memo_save)
 on(q("#dDelete"), "click", on_delete)
+on(q("#dAbuse"), "click", on_abuse)
 on(dlg.querySelector("[data-close]"), "click", lambda e: dlg.close())
 on(dlg, "click", lambda e: dlg.close() if e.target == dlg else None)
 

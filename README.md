@@ -45,7 +45,16 @@
    (v2.2.1 전에 이미 만들었다면 한 번 더 Run 하면 위험/불편 종류 칸이 더해집니다.)
 3. **Authentication → Users → Add user** 로 선생님 계정(이메일·비밀번호)을 만들고,
    SQL Editor 에서 설정 맨 아래 줄의 이메일을 바꿔 실행해 선생님으로 등록합니다.
-4. **Authentication → Sign In / Providers** 에서 *Allow new users to sign up* 을 끕니다 (아무나 계정을 못 만들게).
+4. 학생 구글 로그인을 켭니다 (`config.py` 의 `STUDENT_LOGIN = True`, 기본값).
+   - **Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID 만들기** (웹 애플리케이션).
+     *승인된 리디렉션 URI* 에 Supabase **Authentication → Providers → Google** 화면에 나오는 *Callback URL* 을 넣습니다.
+   - 받은 *클라이언트 ID* 와 *클라이언트 보안 비밀번호* 를 Supabase **Providers → Google** 에 넣고 켭니다.
+   - Supabase **Authentication → URL Configuration** 의 *Site URL* 과 *Redirect URLs* 에 사이트 주소
+     (`https://ddong-jam.github.io/gwangdeok-safety-map/`, 내 컴퓨터 시험용 `http://localhost:5178/`) 를 넣습니다.
+   - 학교 구글 계정만 받으려면 `config.py` 의 `SCHOOL_EMAIL_DOMAIN` 에 학교 도메인(예: `gwangdeok.hs.kr`)을 넣고,
+     설정 SQL 을 **다시 복사해서 Run** 합니다 (도메인 규칙이 데이터베이스에 들어갑니다).
+   - 학생이 처음 로그인할 때 계정이 생겨야 하므로 *Allow new users to sign up* 은 켜 둡니다.
+     구글이 아닌 방법(이메일 가입)으로 만든 계정은 데이터베이스 규칙이 신고를 막습니다.
 5. **Project Settings → API** 의 *Project URL* 과 *anon public* 키를 `config.py` 에 넣고 GitHub 에 올립니다.
 
    ```python
@@ -57,6 +66,18 @@
    - 학생(로그인 없음): 신고 넣기 + 공개 칸(위치·유형·위험도·제목·장소·상태)만 보기
    - 선생님(등록된 계정): 모든 칸 보기 · 처리 · 삭제
    - **service_role 키는 절대 넣지 마세요.**
+6. (선택) 선생님들이 계정 하나를 같이 쓰려면 `config.py` 의 `TEACHER_EMAIL` 에 그 계정 이메일을 넣습니다.
+   로그인 화면에 이메일 칸이 사라지고 **이름 + 비밀번호**만 넣으면 됩니다.
+
+### 보안 · 장난 신고 막기 (v2.5.0)
+
+- **선생님 로그인**: 비밀번호를 5번 틀리면 3분 동안 잠깁니다. *이 기기에서 로그인 유지*를 고르면 14일, 아니면 탭을 닫을 때까지 로그인됩니다.
+  로그아웃하면 서버에서도 그 로그인을 없앱니다. Supabase **Authentication → Policies(또는 Providers → Email)** 에서 비밀번호 최소 길이를 10자 이상으로 하세요.
+- **신고 전 안내문**: 학생은 "사실대로 신고합니다"에 체크해야 접수할 수 있습니다.
+- **자동으로 막는 것** (`guard.py`, 공용 모드에서는 데이터베이스가 한 번 더 확인):
+  알아볼 수 없는 제목(ㅋㅋㅋㅋㅋ 등), 욕설, 한 기기 10분 3건·하루 10건 넘게, 같은 자리 30분 안에 다시 신고, 학교 전체 10분 60건 넘게.
+- **선생님이 막기**: 신고 상세의 *장난 신고로 반려 + 이 기기 신고 막기*. 기기는 브라우저가 만든 무작위 번호라서
+  브라우저 기록을 지우면 다시 신고할 수 있습니다. 생활지도와 함께 쓰세요.
 
 ## 내 컴퓨터에서 실행
 
@@ -68,7 +89,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=21` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=24` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -133,6 +154,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 | v2.3.2 | 캠퍼스 배치도를 위성사진에 맞게: 대운동장 트랙을 잔디 전체를 감싸는 타원으로, 트랙과 골대 사이 양쪽에 농구장(위에서 본 모양), 트랙과 야외 화장실 사이 나무·벤치, 트랙 밖에 잘못 있던 농구장 삭제, 건축선·인접대지경계선·높이(105.5)·10M 치수선·제목 같은 도면 표시와 트랙 위 옛 선 지우기 |
 | v2.3.3 | 도면 밖 빈 곳을 누르면 위험/불편 신고 창이 뜨지 않음 (도면 선 안쪽을 눌렀을 때만 신고) |
 | v2.4.0 | 소운동장을 위성사진 참고해 다시 그림(태극기 모양 마당, 연못, 정자, 돌길) · 특별교실동을 덕후재(9동, 급식실)와 귀촌관(7동, 특별교실)으로 나누고 색을 다르게, 층 도면도 경계에서 나눠 보여줌 · 단재관 2층 → 귀촌관 2층 연결 버튼 |
+| v2.5.0 | 학생은 신고할 때만 학교 구글 계정으로 로그인(지도 보기는 로그인 없이) · 선생님 '이 기기에서 로그인 유지(14일)', 비밀번호 5번 틀리면 3분 잠금, 로그아웃 시 서버 로그인도 삭제 · 신고 전 허위 신고 안내문과 '사실대로 신고합니다' 체크 · 장난 제목·욕설·잦은 신고·같은 자리 다시 신고 자동 차단(guard.py + 데이터베이스 규칙) · 선생님이 장난 신고를 반려하고 그 계정(또는 기기) 신고 막기 |
 | v2.3.1 | 홈(캠퍼스 배치도)에서도 확대·이동 가능 |
 | v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |

@@ -7,6 +7,8 @@ theme.apply()
 pages.mount("student")
 
 import asyncio
+import json
+import time
 
 from js import window
 from pyodide.ffi import create_proxy
@@ -15,7 +17,8 @@ from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, KINDS, L
                     kind_of, link_label, place_name, plan_of, search)
 from common import (SEVERITY_DOTS, category_name, closest, esc, fmt_time, hide_loading, is_open, kind_badge, on, q, qa,
                     shrink_photo, status_badge, severity_badge, time_ago, toast)
-from store import SHARED, StoreError, store
+import guard
+from store import SCHOOL_DOMAIN, SHARED, STUDENT_LOGIN, StoreError, store
 from viewer import PlanViewer
 
 state = {
@@ -274,17 +277,98 @@ on(q("#kindChips"), "change", on_kind_change)
 
 
 def open_form():
+    if STUDENT_LOGIN and not store.student:
+        open_login()  # 신고할 때만 로그인 (찍은 자리는 기억해 둔다)
+        return
+    show_who()
     form.reset()
     on_kind_change()
     state["photo"] = None
     q("#photoPreview").hidden = True
     q("#photoHint").textContent = "사진 추가 · 촬영"
     q("#formWhere").textContent = f"📍 {place_name(state['place'])}"
+    state["form_opened"] = time.time()
     form_dialog.showModal()
 
 
 def close_form(e=None):
     form_dialog.close("cancel")
+
+
+# ── 학생 로그인 (신고할 때만) ──────────────────────
+login_dialog = q("#loginDialog")
+PENDING_KEY = "kd-safety-pending-report"
+
+
+def show_who():
+    st = store.student if STUDENT_LOGIN else None
+    who = q("#formWho")
+    who.hidden = not st
+    if st:
+        who.innerHTML = (f'👤 {esc(st.get("name") or st["email"])} <small>{esc(st["email"])}</small> '
+                         f'<button type="button" class="link-btn" id="btnStudentLogout">로그아웃</button>')
+    q("#noticeRecord").textContent = ("신고하면 내 구글 계정과 시간이 함께 기록돼요. (선생님만 볼 수 있어요)" if st
+                                      else "신고하면 시간과 이 기기 정보가 함께 기록돼요. (익명이어도 기록돼요)")
+
+
+def open_login():
+    q("#demoNameField").hidden = SHARED
+    dom = q("#loginDomain")
+    dom.hidden = not SCHOOL_DOMAIN
+    dom.innerHTML = f"<b>@{esc(SCHOOL_DOMAIN)}</b> 학교 계정만 신고할 수 있어요." if SCHOOL_DOMAIN else ""
+    login_dialog.showModal()
+
+
+def on_login_close(e):
+    if not (STUDENT_LOGIN and store.student) and not form_dialog.open:
+        set_draft(None)
+
+
+async def on_google(e):
+    if not SHARED:  # 체험 모드: 구글 대신 이름만
+        name = str(q("#demoName").value).strip() or "체험 학생"
+        await store.student_login(name)
+        login_dialog.close()
+        open_form()
+        return
+    # 구글에 다녀오면 페이지가 새로 열리니, 보던 층과 찍은 자리를 기억해 둔다
+    window.sessionStorage.setItem(PENDING_KEY, json.dumps({"place": state["place"], "draft": state["draft"]}))
+    back = window.location.origin + window.location.pathname
+    window.location.href = store.google_url(back)
+
+
+async def finish_google_return():
+    """구글 로그인에서 돌아왔을 때: 로그인을 마치고, 보던 층으로 가서 신고 창을 다시 연다."""
+    h = str(window.location.hash)
+    if "access_token=" not in h and "error=" not in h:
+        return None
+    err = await store.finish_google(h)
+    try:
+        pending = json.loads(window.sessionStorage.getItem(PENDING_KEY) or "{}")
+    except Exception:
+        pending = {}
+    window.sessionStorage.removeItem(PENDING_KEY)
+    place = pending.get("place") or SITE_ID
+    window.history.replaceState(None, "", window.location.pathname + ("" if place == SITE_ID else f"#{place}"))
+    if err:
+        toast(err)
+        return None
+    toast("로그인했어요")
+    return pending
+
+
+def on_who_click(e):
+    if closest(e, "#btnStudentLogout"):
+        store.student_logout()
+        close_form()
+        toast("로그아웃했어요")
+
+
+on(q("#btnGoogle"), "click", on_google)
+on(login_dialog, "close", on_login_close)
+on(login_dialog.querySelector("[data-close]"), "click", lambda e: login_dialog.close())
+on(login_dialog, "click", lambda e: login_dialog.close() if e.target == login_dialog else None)
+on(q("#formWho"), "click", on_who_click)
 
 
 for b in form_dialog.querySelectorAll("[data-close]"):
@@ -329,6 +413,14 @@ def checked(name):
 
 async def on_submit(e):
     if not state["draft"]:
+        return
+    # 장난 신고 막기: 너무 빨리 누르면 한 번 더 확인, 글 내용 확인 (공용 모드에서는 서버가 한 번 더 확인)
+    if time.time() - state.get("form_opened", 0) < guard.LIMITS["min_fill_sec"]:
+        toast(guard.MESSAGES["fast"])
+        return
+    problem = guard.check_text(field("title"), field("desc"), field("spot"), field("reporter"))
+    if problem:
+        toast(problem)
         return
     btn = q("#formSubmit")
     btn.disabled = True
@@ -543,7 +635,12 @@ on(search_input, "blur", lambda e: window.setTimeout(create_proxy(lambda: setatt
 
 # ── 시작 ─────────────────────────────────────────
 q("#demoNote").hidden = SHARED
+pending = await finish_google_return()
 await refresh_reports()
 await navigate(parse_hash())
+if pending and pending.get("draft") and STUDENT_LOGIN and store.student:
+    set_mode("report")
+    set_draft(tuple(pending["draft"]))
+    open_form()
 q("#btnReport").disabled = False
 hide_loading()

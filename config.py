@@ -4,3 +4,12 @@
 
 SUPABASE_URL = ""        # 예: "https://abcdefgh.supabase.co"
 SUPABASE_ANON_KEY = ""   # Project Settings → API → anon public 키 (공개용 키라 올려도 됨)
+# 선생님들이 계정 하나를 같이 쓸 때 그 이메일. 넣으면 로그인 화면에 이메일 칸 없이 이름 + 비밀번호만 나온다.
+# 비워두면 선생님마다 자기 이메일·비밀번호로 로그인한다.
+TEACHER_EMAIL = ""
+
+# 학생도 구글 계정으로 로그인해야 신고할 수 있게 한다 (지도 보기는 로그인 없이 된다).
+# 공용 모드에서는 Supabase → Authentication → Providers → Google 을 켜야 한다 (README 참고).
+STUDENT_LOGIN = True
+# 학교 구글 계정 도메인 (예: "gwangdeok.hs.kr"). 넣으면 그 도메인 계정만 신고할 수 있다. 비우면 아무 구글 계정.
+SCHOOL_EMAIL_DOMAIN = ""

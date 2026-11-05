@@ -448,6 +448,31 @@ body.reporting .link { pointer-events: none; opacity: 0.5; }
 }
 .back-btn:hover { background: #e2e8f0; }
 .back-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+/* ── 장난 신고 막기 · 로그인 유지 ─────── */
+.check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+.check span { display: flex; flex-direction: column; gap: 2px; }
+.check b { font-size: 14.5px; color: var(--ink); }
+.check small { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.notice { border: 1px solid #fcd34d; background: #fffbeb; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.notice > b { font-size: 14px; color: #92400e; }
+.notice ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.notice .check { padding-top: 6px; border-top: 1px dashed #fcd34d; }
+.t-abuse { margin-top: 14px; }
+.t-abuse:empty { display: none; }
+.t-abuse .blocked { color: var(--danger); }
+
+/* ── 학생 구글 로그인 ─────────────────── */
+.login-lead { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-2); }
+.login-points { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 16px;
+  border: 1px solid var(--line-2); border-radius: 12px; background: #fff; color: #1f1f1f; font-weight: 700; font-size: 15px; }
+.btn-google:hover { background: #f8fafc; }
+.btn-google svg { width: 20px; height: 20px; }
+.who-line { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.who-line small { color: var(--muted); font-size: 12px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 12.5px; font-weight: 600; text-decoration: underline; }
+
 '''
 
 
