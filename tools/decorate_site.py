@@ -38,7 +38,8 @@ ERASE = [
     (154, 260, 346, 269),    # 잔디 위쪽 옛 울타리 선
 ]
 # 도면 글씨를 지우고 웹 글꼴로 다시 쓰는 곳: (지울 영역, 글자, 가운데 좌표, 크기)
-RETEXT = [((231, 383, 277, 394), "대운동장", (254, 389), 17)]
+RETEXT = [((231, 383, 277, 394), "대운동장", (254, 389), 17),
+          ((458, 245, 491, 258), "소운동장", (424, 287), 9)]
 FONT = "Pretendard, 'Malgun Gothic', sans-serif"
 
 LINE = {"l": ("#475569", 0.6), "m": ("#1e293b", 1.0), "w": ("#0f172a", 1.7)}  # 색, 화면 px 굵기
@@ -157,6 +158,82 @@ def benches(points, w=7, h=2.4):
             f'fill="{C["bench"]}" stroke="#7c5a3a" stroke-width="0.35"/>' for x, y in points]
 
 
+SMALL = (402, 210, 552, 295)   # 소운동장 (도면 테두리)
+
+
+def taegeuk_flag(cx, cy, h):
+    """위에서 본 태극기 모양 마당: 흰 바닥 + 가운데 태극 + 네 귀퉁이 괘 (건·곤·감·리)."""
+    w = h * 1.5
+    out = [f'<rect x="{fmt(cx - w / 2)}" y="{fmt(cy - h / 2)}" width="{fmt(w)}" height="{fmt(h)}" rx="1.5" '
+           f'fill="#fbfaf6" stroke="#cbbf9f" stroke-width="0.6"/>']
+    r = h / 4
+    tilt = math.degrees(math.atan2(2, 3))
+    out.append(f'<g transform="translate({fmt(cx)} {fmt(cy)}) rotate({fmt(tilt)})">'
+               f'<circle r="{fmt(r)}" fill="#0047a0"/>'
+               f'<path fill="#cd2e3a" d="M{fmt(-r)} 0A{fmt(r)} {fmt(r)} 0 0 1 {fmt(r)} 0'
+               f'A{fmt(r / 2)} {fmt(r / 2)} 0 0 0 0 0A{fmt(r / 2)} {fmt(r / 2)} 0 0 1 {fmt(-r)} 0Z"/></g>')
+    # 괘: (방향, 막대 3개가 끊겼는지) — 건 ☰ 왼쪽 위, 감 ☵ 오른쪽 위, 리 ☲ 왼쪽 아래, 곤 ☷ 오른쪽 아래
+    bar_l, bar_t, gap = h / 4, h / 24, h / 48
+    for sx, sy, broken in ((-1, -1, (0, 0, 0)), (1, -1, (1, 0, 1)), (-1, 1, (0, 1, 0)), (1, 1, (1, 1, 1))):
+        ang = math.atan2(sy * h, sx * w)
+        d = h * 0.25 + h / 6 + bar_l * 0.1
+        tx, ty = cx + d * math.cos(ang) * 1.12, cy + d * math.sin(ang)
+        rot = math.degrees(ang) + 90
+        g = [f'<g transform="translate({fmt(tx)} {fmt(ty)}) rotate({fmt(rot)})" fill="#1f2937">']
+        for i, br in enumerate(broken):
+            y = (i - 1) * (bar_t + gap) - bar_t / 2
+            if br:
+                half = bar_l / 2 - gap / 2
+                g.append(f'<rect x="{fmt(-bar_l / 2)}" y="{fmt(y)}" width="{fmt(half)}" height="{fmt(bar_t)}"/>')
+                g.append(f'<rect x="{fmt(gap / 2)}" y="{fmt(y)}" width="{fmt(half)}" height="{fmt(bar_t)}"/>')
+            else:
+                g.append(f'<rect x="{fmt(-bar_l / 2)}" y="{fmt(y)}" width="{fmt(bar_l)}" height="{fmt(bar_t)}"/>')
+        out.append("".join(g) + "</g>")
+    return out, box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+
+
+def pavilion(cx, cy, r):
+    """위에서 본 육각 정자 지붕."""
+    pts = [(cx + r * math.cos(math.radians(30 + 60 * i)), cy + r * math.sin(math.radians(30 + 60 * i))) for i in range(6)]
+    ring = "L".join(f"{fmt(x)} {fmt(y)}" for x, y in pts)
+    ridges = "".join(f"M{fmt(cx)} {fmt(cy)}L{fmt(x)} {fmt(y)}" for x, y in pts)
+    return [f'<path d="M{ring}Z" fill="#9a6a43" stroke="#5b3a22" stroke-width="0.6" stroke-linejoin="round"/>',
+            f'<path d="{ridges}" fill="none" stroke="#5b3a22" stroke-width="0.45"/>',
+            f'<circle cx="{fmt(cx)}" cy="{fmt(cy)}" r="{fmt(r * 0.18)}" fill="#c9a227"/>'], Point(cx, cy).buffer(r + 1.5)
+
+
+def pond():
+    """정자 옆 연못 (가장자리 돌, 연잎)."""
+    water = unary_union([Point(458, 279).buffer(9), Point(472, 282).buffer(8), Point(484, 278).buffer(6.5),
+                         Point(466, 272).buffer(6)]).buffer(1.5).buffer(-1.5)
+    out = [fill(water.buffer(1.4), "#a8a29e"), fill(water, "#7cc4e4"), fill(water.buffer(-2.2), "#5fb0d8")]
+    rnd = random.Random(7)
+    edge = water.exterior
+    for i in range(22):
+        p = edge.interpolate(i / 22, normalized=True)
+        out.append(f'<circle cx="{fmt(p.x)}" cy="{fmt(p.y)}" r="{fmt(rnd.uniform(.9, 1.5))}" fill="#d6d3d1" stroke="#78716c" stroke-width="0.25"/>')
+    for x, y in [(456, 280), (461, 284), (474, 280), (470, 286)]:
+        out.append(f'<circle cx="{x}" cy="{y}" r="1.5" fill="#4d9a52"/>')
+    return out, water.buffer(2.5)
+
+
+def small_garden():
+    x0, y0, x1, y1 = SMALL
+    area = box(x0 + 1, y0 + 1, x1 - 1, y1 - 1)
+    out = [fill(area, "#d9cfa6")]
+    flag, flag_box = taegeuk_flag(486, 237, 40)
+    water, water_area = pond()
+    pav, pav_area = pavilion(504, 281, 7.5)
+    # 돌길: 왼쪽 입구 → 태극기 마당 아래 → 정자
+    walk = unary_union([LineString([(x0, 262), (440, 262), (504, 262), (504, 281)]).buffer(2.4),
+                        flag_box.buffer(2.5)])
+    out.append(fill(walk.intersection(area), C["path"]))
+    out += flag + water + pav
+    avoid = unary_union([walk, water_area, pav_area, box(405, 280, 444, 294)])
+    out += trees(area.buffer(-2), 10, 2.8, 5, avoid=avoid)
+    return out
+
+
 def trees(area, step, r, seed, avoid=None):
     """area 안에 나무(동그라미)를 고르게 흩어 심는다."""
     rnd = random.Random(seed)
@@ -264,8 +341,8 @@ def main():
         if i % 2:
             deco.append(fill(box(178, y, 330, min(508, y + 20)), C["turf2"]))
 
-    # 소운동장
-    deco.append(fill(box(402, 210, 552, 295), C["dirt"]))
+    # 소운동장: 태극기 모양 마당 + 연못 + 정자 (위성사진)
+    deco += small_garden()
 
     # 중정: 잔디 + 십자 길 + 가운데 원
     cx, cy = 573, 431
@@ -294,12 +371,11 @@ def main():
     deco += benches([(x, 574) for x in range(186, 326, 26)] + [(x, 604) for x in range(199, 326, 26)])
     deco += trees(rest, 12, 4.4, 6, avoid=unary_union([box(178, 571, 330, 577), box(191, 601, 330, 607)]))
     deco += row_of_trees((676, 380), (684, 600), 10, 3.6, 4)
-    deco += trees(box(406, 214, 548, 291), 22, 4.2, 5)
     for (x, y) in [(522, 381), (623, 381), (522, 479), (623, 479)]:
         deco.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{C["tree"]}" fill-opacity=".9"/>')
 
     texts = [f'<text x="{x}" y="{fmt(y + size * 0.36)}" font-size="{size}" font-weight="800" font-family="{FONT}" '
-             f'text-anchor="middle" fill="{TEXT}" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round" '
+             f'text-anchor="middle" fill="{TEXT}" stroke="#ffffff" stroke-width="{fmt(min(2.4, size * 0.16))}" stroke-linejoin="round" '
              f'paint-order="stroke" letter-spacing="0.5">{word}</text>' for _, word, (x, y), size in RETEXT]
     out = head + '<g id="deco">' + "".join(deco) + "</g>" + "".join(paths) + "".join(texts) + "</svg>"
     open(SITE, "w", encoding="utf-8").write(out)

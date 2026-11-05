@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from js import window
 
 from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, KINDS, SEVERITIES, SITE_ID, STATUSES,
-                    building_of, kind_of, place_name)
+                    building_of, kind_of, place_name, plan_of)
 from common import (KST, SEVERITY_DOTS, category_name, closest, download, esc, fmt_time, hide_loading, is_open,
                     kind_badge, on,
                     parse_time, q, qa, status_badge, severity_badge, time_ago, toast)
@@ -272,7 +272,7 @@ async def load_map(map_id):
     if state["map_loaded"] != map_id:
         state["map_loaded"] = map_id
         try:
-            if not await tmap.load(f"./plans/{map_id}.svg", locked=map_id == SITE_ID):
+            if not await tmap.load(plan_of(map_id)[0], locked=map_id == SITE_ID, crop=plan_of(map_id)[1]):
                 return
         except Exception as e:
             toast(str(e))
@@ -363,7 +363,7 @@ async def _open_detail(rid):
     if not dlg.open:
         dlg.showModal()
     # 작은 지도: 신고 위치를 확대해서 보여준다
-    if await mini.load(f"./plans/{r['map']}.svg"):
+    if await mini.load(plan_of(r["map"])[0], crop=plan_of(r["map"])[1]):
         mini.draw_pins([r], rid)
         mini.focus(r["x"], r["y"] - 8, min(mini.size[0], 260))
 

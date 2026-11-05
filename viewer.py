@@ -13,7 +13,7 @@ from common import esc, on
 NS = "http://www.w3.org/2000/svg"
 ROOM = 1.3       # 도면 크기의 130% 까지만 멀어지고, 그 밖으로는 끌고 갈 수 없다
 MAX_ZOOM = 10    # 가장 멀리 본 것보다 10배까지 가까이
-PLANS_VERSION = "2.3.2"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
+PLANS_VERSION = "2.4.0"  # plans/*.svg 를 고치면 올린다 (브라우저가 옛날 도면을 쓰지 않게)
 PIN_PATH = "M0 0C-1.6-5.4-11-9.6-11-18.5a11 11 0 0 1 22 0C11-9.6 1.6-5.4 0 0z"
 _svg_cache = {}
 
@@ -69,7 +69,8 @@ class PlanViewer:
         ResizeObserver.new(create_proxy(lambda *a: self.fit() if self.locked else self.apply())).observe(svg)
 
     # ── 도면 불러오기 ──
-    async def load(self, url, locked=False):
+    async def load(self, url, locked=False, crop=None):
+        """crop=(x0, x1): 도면에서 이 x 범위만 보여준다 (한 장에 두 건물이 있는 층)."""
         self._token += 1
         self.locked = locked
         self.svg.classList.toggle("is-locked", locked)
@@ -81,19 +82,37 @@ class PlanViewer:
             return False  # 그 사이에 다른 층을 눌렀다
         m = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', text[:400])
         self.size = (float(m.group(1)), float(m.group(2)))
-        self._clip_rect.setAttribute("width", self.size[0])
+        x0, x1 = crop or (0, self.size[0])
+        self._clip_rect.setAttribute("x", x0)
+        self._clip_rect.setAttribute("width", x1 - x0)
         self._clip_rect.setAttribute("height", self.size[1])
         inner = text[text.index(">", text.index("<svg")) + 1: text.rindex("</svg>")]
         self.layers["plan"].innerHTML = inner
         self.svg.classList.remove("is-loading")
-        self.bounds = self._content_box()
+        self.bounds = self._content_box(x0, x1)
         self.fit()
         return True
 
-    def _content_box(self):
-        """도면 안에서 선·글자가 실제로 있는 영역 (화면에 안 보일 때는 도면 전체)."""
+    def _content_box(self, cx0=0.0, cx1=None):
+        """도면 안에서 선·글자가 실제로 있는 영역 (화면에 안 보일 때는 도면 전체).
+        cx0~cx1 로 잘라 보여줄 때는 그 안에 있는 그림만 센다."""
         W, H = self.size
+        cx1 = W if cx1 is None else cx1
         try:
+            if cx0 > 0 or cx1 < W:
+                xs, ys = [], []
+                for e in self.layers["plan"].querySelectorAll("path, rect, text, line, polyline, polygon"):
+                    b = e.getBBox()
+                    if b.width * b.height == 0 and b.width + b.height == 0:
+                        continue
+                    if b.x >= cx0 - 1 and b.x + b.width <= cx1 + 1:
+                        xs += [b.x, b.x + b.width]
+                        ys += [b.y, b.y + b.height]
+                if xs:
+                    x0, x1 = max(cx0, min(xs)), min(cx1, max(xs))
+                    y0, y1 = max(0, min(ys)), min(H, max(ys))
+                    return (x0, y0, x1 - x0, y1 - y0)
+                return (cx0, 0.0, cx1 - cx0, H)
             b = self.layers["plan"].getBBox()
             x0, y0 = max(0, b.x), max(0, b.y)
             x1, y1 = min(W, b.x + b.width), min(H, b.y + b.height)
@@ -101,7 +120,7 @@ class PlanViewer:
                 return (x0, y0, x1 - x0, y1 - y0)
         except Exception:
             pass
-        return (0.0, 0.0, W, H)
+        return (cx0, 0.0, cx1 - cx0, H)
 
     # ── 보기 영역 ──
     def fit(self):

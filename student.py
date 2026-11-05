@@ -12,7 +12,7 @@ from js import window
 from pyodide.ffi import create_proxy
 
 from campus import (BUILDING_BY_ID, BUILDINGS, CATEGORIES, FLOOR_INDEX, KINDS, LINKS, SEVERITIES, SITE_ID, building_at,
-                    kind_of, link_label, place_name, search)
+                    kind_of, link_label, place_name, plan_of, search)
 from common import (SEVERITY_DOTS, category_name, closest, esc, fmt_time, hide_loading, is_open, kind_badge, on, q, qa,
                     shrink_photo, status_badge, severity_badge, time_ago, toast)
 from store import SHARED, StoreError, store
@@ -33,7 +33,7 @@ viewer = PlanViewer(q("#map"))
 
 
 def plan_url(place):
-    return f"./plans/{place}.svg"
+    return plan_of(place)[0]
 
 
 def open_count(pred):
@@ -83,7 +83,7 @@ async def navigate(place, after=None):
     if changed:
         state["loaded"] = place
         try:
-            if not await viewer.load(plan_url(place), locked=False):  # 캠퍼스 배치도도 확대·이동 (v2.3.1)
+            if not await viewer.load(plan_url(place), locked=False, crop=plan_of(place)[1]):  # 캠퍼스 배치도도 확대·이동 (v2.3.1)
                 return
         except Exception as e:
             toast(str(e))

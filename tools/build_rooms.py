@@ -151,6 +151,17 @@ def build(sources):
     return rooms
 
 
+def owner(fid, x):
+    """도면 파일 + x → 층 id. 한 도면을 두 건물이 나눠 쓰면(덕후재 | 귀촌관) x 로 고른다."""
+    sys.path.insert(0, ROOT)
+    from campus import BUILDINGS
+    for b in BUILDINGS:
+        for f in b.floors:
+            if (f.src or f.id) == fid and (f.crop is None or f.crop[0] <= x < f.crop[1]):
+                return f.id
+    return fid
+
+
 def main():
     if sys.argv[1:2] == ["--index"]:
         sources = []
@@ -164,7 +175,7 @@ def main():
             f.write('"""검색용 방 목록 — tools/build_rooms.py 가 만든다. (층, 번호, 이름, x, y)"""\n\n')
             f.write("ROOMS = [\n")
             for r in rooms:
-                f.write(f"    {tuple(r)!r},\n")
+                f.write(f"    {(owner(r[0], r[3]), *r[1:])!r},\n")
             f.write("]\n\n")
             f.write('# 반 이름 (층, 반, 호실, x, y)\nCLASSES = [\n')
             for fid in sorted(classes):
@@ -172,7 +183,7 @@ def main():
                     if num is None:  # 바로 위에 있는 호실 번호
                         num = next((r[1] for r in rooms
                                     if r[0] == fid and abs(r[3] - x) < 20 and -26 < r[4] - y < 4), "")
-                    f.write(f"    {(fid, t, num, x, y)!r},\n")
+                    f.write(f"    {(owner(fid, x), t, num, x, y)!r},\n")
             f.write("]\n")
         print(f"rooms.py: 방 {len(rooms)}개, 반 {sum(len(v) for v in classes.values())}개")
     else:
