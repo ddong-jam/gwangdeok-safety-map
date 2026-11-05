@@ -21,6 +21,22 @@ SITE = os.path.join(ROOT, "plans", "site.svg")
 # 도면은 남쪽이 위 (위성사진을 180° 돌린 방향)
 ARCHERY = (180, 228, 322, 266)        # 양궁장: 이 안의 선·글자는 모두 지운다
 ARCHERY_EDGE = (322, 228, 342, 266)   # 체육실동과 겹치는 곳: 양궁장 점무늬(아주 작은 조각)만 지운다
+# 실제와 맞지 않는 도면 표시: 이 안에 완전히 들어가는 선·글자는 지운다 (위성사진과 비교)
+ERASE = [
+    (229, 542, 269, 612),    # 농구장 (위성사진에는 없음 — 트랙 끝 흙바닥)
+    (250, 0, 296, 15),       # 건축선(도로경계선) 글자·지시선 (위)
+    (580, 66, 664, 81),      # 〃 (오른쪽 위)
+    (660, 344, 726, 359),    # 〃 (오른쪽)
+    (577, 657, 630, 669),    # 〃 (아래)
+    (84, 335, 137, 348),     # (인접대지경계선)
+    (660, 400, 712, 437),    # 10M 치수선
+    (402, 88, 418, 102),     # 높이 105.5
+    (483, 128, 499, 138),    # 높이 105.5
+    (673, 627, 876, 682),    # 제목 '전체 배치도 · SCALE' 과 동그라미 '1'
+    (178, 226, 334, 236),    # 트랙 위를 가로지르는 옛 선
+    (178, 212, 185, 266),    # 〃 (세로)
+    (154, 260, 346, 269),    # 잔디 위쪽 옛 울타리 선
+]
 # 도면 글씨를 지우고 웹 글꼴로 다시 쓰는 곳: (지울 영역, 글자, 가운데 좌표, 크기)
 RETEXT = [((231, 383, 277, 394), "대운동장", (254, 389), 17)]
 FONT = "Pretendard, 'Malgun Gothic', sans-serif"
@@ -31,7 +47,8 @@ TEXT = "#0f172a"
 C = {
     "campus": "#f6f2e9", "road": "#d5dae1", "dirt": "#eadbbd", "track": "#d9b38c",
     "turf": "#7dbb67", "turf2": "#74b25e", "lawn": "#c3e1aa", "path": "#efe4cb",
-    "forest": "#b5d69b", "tree": "#79b05f", "tree2": "#5f9a49", "park": "#cfd5dc", "court": "#9cc0dc",
+    "sand": "#f1e6cc", "forest": "#b5d69b", "tree": "#79b05f", "tree2": "#5f9a49", "park": "#cfd5dc", "court": "#4f8fbf", "court_key": "#3d7aa8", "court_edge": "#c9b48f",
+    "bench": "#b98a5a",
 }
 
 ROAD_SEEDS = [(300, 3), (590, 60), (697, 450), (400, 667)]
@@ -108,6 +125,38 @@ def stadium(x0, y0, x1, y1):
     return unary_union([top, bot, box(x0, y0 + r, x1, y1 - r)])
 
 
+def court(cx, cy, w=60, h=30):
+    """위에서 본 농구장 (가로로 긴 코트, 양쪽 골대)."""
+    x0, y0, x1, y1 = cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2
+    ln = 'fill="none" stroke="#ffffff" stroke-width="0.7"'
+    key_w, key_h = w * 0.19, h * 0.4
+    out = [fill(box(x0 - 2, y0 - 2, x1 + 2, y1 + 2), C["court_edge"]),
+           fill(box(x0, y0, x1, y1), C["court"]),
+           fill(box(x0, cy - key_h / 2, x0 + key_w, cy + key_h / 2), C["court_key"]),
+           fill(box(x1 - key_w, cy - key_h / 2, x1, cy + key_h / 2), C["court_key"]),
+           f'<rect x="{fmt(x0)}" y="{fmt(y0)}" width="{fmt(w)}" height="{fmt(h)}" {ln}/>',
+           f'<line x1="{fmt(cx)}" y1="{fmt(y0)}" x2="{fmt(cx)}" y2="{fmt(y1)}" {ln}/>',
+           f'<circle cx="{fmt(cx)}" cy="{fmt(cy)}" r="{fmt(h * 0.16)}" {ln}/>']
+    for side in (-1, 1):
+        ex = x0 if side < 0 else x1                     # 끝선
+        kx = ex - side * key_w                         # 자유투 선
+        r3 = h * 0.42                                  # 3점 선
+        out.append(f'<rect x="{fmt(min(ex, kx))}" y="{fmt(cy - key_h / 2)}" width="{fmt(key_w)}" height="{fmt(key_h)}" {ln}/>')
+        out.append(f'<circle cx="{fmt(kx)}" cy="{fmt(cy)}" r="{fmt(key_h / 2)}" {ln}/>')
+        sweep = 1 if side < 0 else 0
+        out.append(f'<path d="M{fmt(ex)} {fmt(cy - r3)}A{fmt(r3)} {fmt(r3)} 0 0 {sweep} {fmt(ex)} {fmt(cy + r3)}" {ln}/>')
+        hx = ex - side * 1.6                           # 골대(백보드 + 링)
+        out.append(f'<line x1="{fmt(hx)}" y1="{fmt(cy - 2.4)}" x2="{fmt(hx)}" y2="{fmt(cy + 2.4)}" stroke="#334155" stroke-width="0.9"/>')
+        out.append(f'<circle cx="{fmt(hx - side * 1.3)}" cy="{fmt(cy)}" r="1" fill="none" stroke="#ea580c" stroke-width="0.6"/>')
+    return out
+
+
+def benches(points, w=7, h=2.4):
+    """위에서 본 벤치 (나무 판)."""
+    return [f'<rect x="{fmt(x - w / 2)}" y="{fmt(y - h / 2)}" width="{fmt(w)}" height="{fmt(h)}" rx="0.6" '
+            f'fill="{C["bench"]}" stroke="#7c5a3a" stroke-width="0.35"/>' for x, y in points]
+
+
 def trees(area, step, r, seed, avoid=None):
     """area 안에 나무(동그라미)를 고르게 흩어 심는다."""
     rnd = random.Random(seed)
@@ -155,7 +204,8 @@ def main():
         keep = []
         for sub in subpaths(a["d"]):
             pts = points(sub)
-            if pts and (inside(pts, ARCHERY) or (cls != "t" and inside(pts, ARCHERY_EDGE) and size(pts) <= 0.6)
+            # ERASE 는 굵은 선(담장·도로 경계, class w)은 남긴다 — 지우면 도로 색칠이 새어 나간다
+            if pts and (inside(pts, ARCHERY) or (cls != "w" and any(inside(pts, r) for r in ERASE)) or (cls != "t" and inside(pts, ARCHERY_EDGE) and size(pts) <= 0.6)
                         or (cls == "t" and any(inside(pts, r[0]) for r in RETEXT))):
                 removed += 1
                 continue
@@ -196,21 +246,23 @@ def main():
     # 숲: 증축예정부지 + 옛 양궁장 자리 + 담장 옆 (위성사진에서 나무가 빽빽한 곳)
     forest = unary_union([
         Polygon([(161, 193), (161, 48), (168, 47), (237, 28), (240, 24), (351, 24), (351, 73), (357, 90), (358, 193)]),
-        box(155, 193, 326, 236),
+        box(155, 193, 326, 214),
     ])
     deco.append(fill(forest, C["forest"]))
 
-    # 대운동장: 흙바닥 → 트랙 → 인조잔디 (줄무늬)
-    ground = box(155, 236, 331, 628).union(box(326, 266, 340, 545))
+    # 대운동장 (위성사진): 흙바닥 → 잔디 전체를 감싸는 타원 트랙 → 트랙 안 흙 → 위쪽 모래밭 → 인조잔디
+    ground = box(155, 214, 331, 628).union(box(326, 214, 342, 560))
     deco.append(fill(ground, C["dirt"]))
-    deco.append(fill(stadium(168, 238, 340, 538), C["track"]))
-    deco.append(fill(stadium(176, 246, 332, 530), C["dirt"]))
+    deco.append(fill(stadium(166, 218, 342, 558), C["track"]))
+    deco.append(fill(stadium(172, 224, 336, 552), C["dirt"]))
+    # 트랙과 골대 사이 (위·아래 끝) 농구장
+    deco += court(254, 245)
+    deco += court(254, 531)
     field = box(178, 267, 330, 508)
     deco.append(fill(field, C["turf"]))
     for i, y in enumerate(range(267, 508, 20)):
         if i % 2:
             deco.append(fill(box(178, y, 330, min(508, y + 20)), C["turf2"]))
-    deco.append(fill(box(231, 544, 267, 610), C["court"]))  # 농구장
 
     # 소운동장
     deco.append(fill(box(402, 210, 552, 295), C["dirt"]))
@@ -237,6 +289,10 @@ def main():
     deco += trees(forest, 9, 4.6, 1)
     deco += trees(Polygon([(140, 60), (154, 60), (154, 628), (138, 628)]), 8, 4, 2)
     deco += row_of_trees((172, 640), (318, 640), 9, 4, 3)
+    # 트랙과 야외 화장실(부3동) 사이: 나무 그늘 + 벤치
+    rest = box(158, 566, 330, 628).difference(stadium(162, 214, 346, 562))
+    deco += benches([(x, 574) for x in range(186, 326, 26)] + [(x, 604) for x in range(199, 326, 26)])
+    deco += trees(rest, 12, 4.4, 6, avoid=unary_union([box(178, 571, 330, 577), box(191, 601, 330, 607)]))
     deco += row_of_trees((676, 380), (684, 600), 10, 3.6, 4)
     deco += trees(box(406, 214, 548, 291), 22, 4.2, 5)
     for (x, y) in [(522, 381), (623, 381), (522, 479), (623, 479)]:
