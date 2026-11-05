@@ -1,3 +1,7 @@
+"""화면 꾸미기 (CSS). 시작할 때 apply() 가 페이지에 붙인다."""
+from js import document
+
+CSS = '''
 :root {
   --bg: #eef1f5;
   --paper: #ffffff;
@@ -444,3 +448,13 @@ body.reporting .link { pointer-events: none; opacity: 0.5; }
 }
 .back-btn:hover { background: #e2e8f0; }
 .back-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+'''
+
+
+def apply():
+    if document.getElementById("theme"):
+        return
+    style = document.createElement("style")
+    style.id = "theme"
+    style.textContent = CSS
+    document.head.appendChild(style)

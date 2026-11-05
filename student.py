@@ -1,4 +1,11 @@
 # 학생용 화면: 캠퍼스 → 건물 → 층 평면도에서 위험한 곳을 찍어 신고한다.
+# 화면 틀(pages.py)과 꾸미기(theme.py)를 먼저 그린다 — 아래 코드가 그 요소들을 찾기 때문
+import pages
+import theme
+
+theme.apply()
+pages.mount("student")
+
 import asyncio
 
 from js import window

@@ -1,4 +1,14 @@
--- 광덕 안전지도 · 공용 모드 데이터베이스 (Supabase → SQL Editor 에 통째로 붙여넣고 Run)
+"""공용 모드(Supabase) 데이터베이스 설정.
+
+    python tools/supabase_setup.py            # 화면에 출력 → 복사해서 Supabase SQL Editor 에 붙여넣고 Run
+    python tools/supabase_setup.py --copy     # 클립보드로 바로 복사 (윈도우)
+
+데이터베이스는 SQL 만 알아듣기 때문에 내용은 SQL 문장이고, 파이썬은 그것을 보관·출력한다.
+"""
+import subprocess
+import sys
+
+SQL = '''-- 광덕 안전지도 · 공용 모드 데이터베이스 (Supabase → SQL Editor 에 통째로 붙여넣고 Run)
 -- 학생(로그인 없음): 신고 접수 + 공개 칸만 보기 (신고자 이름·사진·담당자는 못 봄)
 -- 선생님(admins 에 등록된 계정): 모든 신고 보기 · 처리 · 삭제
 
@@ -89,3 +99,17 @@ grant select on public.public_reports to anon, authenticated;
 -- 1) Authentication → Users → Add user 로 이메일·비밀번호 계정을 만든 뒤
 -- 2) 아래 줄의 이메일을 바꿔서 실행 (선생님마다 한 번씩)
 -- insert into public.admins (user_id) select id from auth.users where email = 'teacher@example.com';
+'''
+
+
+def main():
+    if "--copy" in sys.argv:
+        subprocess.run("clip", input=SQL.encode("utf-16-le"), check=True)
+        print("복사했어요. Supabase → SQL Editor 에 붙여넣고 Run 하세요.")
+    else:
+        sys.stdout.reconfigure(encoding="utf-8")
+        print(SQL)
+
+
+if __name__ == "__main__":
+    main()

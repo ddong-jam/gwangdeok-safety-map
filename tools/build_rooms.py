@@ -5,7 +5,7 @@
 도면에 직접 넣은 반 이름(<text>, 예: 2-1)을 합쳐서 '어느 층 어디에 무슨 방'이 있는지 정리한다.
 
     python tools/build_rooms.py <png 폴더> <배율>             # 1) 배율(2·3·4·6)별로 도면을 그림으로 (PyMuPDF)
-    powershell -File tools/ocr.ps1 <png 폴더> <ocrN.tsv>   # 2) 글자 인식
+    python tools/ocr.py <png 폴더> <ocrN.tsv>              # 2) 글자 인식 (윈도우)
     python tools/build_rooms.py --index <배율>=<ocrN.tsv> ...  # 3) rooms.py 생성
 
 결과 rooms.py 는 손으로 고쳐도 된다 (다시 만들면 덮어쓴다).

@@ -90,7 +90,7 @@ class LocalStore:
 
 
 class SupabaseStore:
-    """공용 모드: Supabase(PostgreSQL) REST API. 권한은 supabase.sql 의 규칙(RLS)이 지킨다."""
+    """공용 모드: Supabase(PostgreSQL) REST API. 권한은 tools/supabase_setup.py 의 규칙(RLS)이 지킨다."""
     shared = True
     TOKEN_KEY = "kd-safety-teacher-token"
 

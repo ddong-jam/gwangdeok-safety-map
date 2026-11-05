@@ -1,7 +1,7 @@
 # 광덕 안전지도 (v2 · Python)
 
 광덕중·고등학교 캠퍼스 **2D 평면도 기반 안전신문고**입니다.
-화면 코드는 모두 파이썬이고, [PyScript](https://pyscript.net)로 브라우저 안에서 바로 실행됩니다.
+화면 틀·꾸미기·동작까지 우리가 쓴 코드는 모두 파이썬(`.py`)이고 (`index.html`·`teacher.html` 은 파이썬을 불러오는 시작용 몇 줄), [PyScript](https://pyscript.net)로 브라우저 안에서 바로 실행됩니다.
 그래서 따로 서버를 올리지 않아도 **GitHub Pages 링크만으로** 열립니다.
 
 | 링크 | 누가 | 하는 일 |
@@ -41,10 +41,10 @@
 ### 신고를 모두 함께 보기 (Supabase, 무료)
 
 1. <https://supabase.com> 에서 새 프로젝트를 만듭니다.
-2. **SQL Editor** 에 [`supabase.sql`](supabase.sql) 내용을 통째로 붙여넣고 **Run**.
+2. `python tools/supabase_setup.py --copy` 로 데이터베이스 설정을 복사해서 **SQL Editor** 에 붙여넣고 **Run**.
    (v2.2.1 전에 이미 만들었다면 한 번 더 Run 하면 위험/불편 종류 칸이 더해집니다.)
 3. **Authentication → Users → Add user** 로 선생님 계정(이메일·비밀번호)을 만들고,
-   SQL Editor 에서 `supabase.sql` 맨 아래 줄의 이메일을 바꿔 실행해 선생님으로 등록합니다.
+   SQL Editor 에서 설정 맨 아래 줄의 이메일을 바꿔 실행해 선생님으로 등록합니다.
 4. **Authentication → Sign In / Providers** 에서 *Allow new users to sign up* 을 끕니다 (아무나 계정을 못 만들게).
 5. **Project Settings → API** 의 *Project URL* 과 *anon public* 키를 `config.py` 에 넣고 GitHub 에 올립니다.
 
@@ -53,7 +53,7 @@
    SUPABASE_ANON_KEY = "eyJhbGciOi..."
    ```
 
-   anon 키는 공개해도 되는 키입니다. 누가 무엇을 볼 수 있는지는 `supabase.sql` 의 규칙(RLS)이 지킵니다.
+   anon 키는 공개해도 되는 키입니다. 누가 무엇을 볼 수 있는지는 `tools/supabase_setup.py` 의 규칙(RLS)이 지킵니다.
    - 학생(로그인 없음): 신고 넣기 + 공개 칸(위치·유형·위험도·제목·장소·상태)만 보기
    - 선생님(등록된 계정): 모든 칸 보기 · 처리 · 삭제
    - **service_role 키는 절대 넣지 마세요.**
@@ -68,7 +68,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=16` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=17` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -81,11 +81,11 @@ viewer.py      평면도 보기 (확대 · 이동 · 핀)
 store.py       신고 저장 (체험 모드 / Supabase 공용 모드)
 common.py      공통 도구 (이벤트 연결 · 배지 · 시간 표시 · 사진 줄이기)
 config.py      Supabase 주소 · 키 (비우면 체험 모드)
-style.css      화면 꾸미기
-supabase.sql   공용 모드 데이터베이스 만들기
+pages.py       화면 틀 (버튼·검색창·신고 창 등 HTML)
+theme.py       화면 꾸미기 (CSS)
 serve.py       내 컴퓨터용 테스트 서버
 plans/*.svg    배치도 + 층별 평면도
-tools/         PDF → SVG 변환, 배치도 꾸미기, 검색용 방 목록 만들기
+tools/         PDF → SVG 변환, 배치도 꾸미기, 검색용 방 목록(글자 인식 ocr.py), Supabase 설정(supabase_setup.py)
 ```
 
 ## 도면 다시 만들기
@@ -114,7 +114,7 @@ python tools/decorate_floors.py
 
 ```bash
 python tools/build_rooms.py png2 2      # 배율 2·3·4·6 으로 각각 그림 만들기
-powershell -File tools/ocr.ps1 png2 ocr2.tsv
+python tools/ocr.py png2 ocr2.tsv          # 윈도우 글자 인식 (pip install winrt-... 는 파일 맨 위 참고)
 python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 ```
 
@@ -130,6 +130,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 
 | 버전 | 내용 |
 |---|---|
+| v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |
 | v2.2.1 | 위험/불편 신고: 도면을 누르면 그 자리에 바로 신고, 위험·불편 중에 고르기 (불편은 보라색 핀), 선생님 화면에 종류 칸·필터·CSV 추가 |
 | v2.1.6 | 이름표 상자 안 글씨(중학교 1층 샤워.탈의실·교직원화장실)를 두 줄로 나누지 않고 상자에 맞춤, 글씨를 키울 때 위치가 조금씩 어긋나던 문제 수정 (보일러실·화장실 등 제자리로) |

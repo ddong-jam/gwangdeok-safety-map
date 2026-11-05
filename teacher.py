@@ -1,4 +1,11 @@
 # 선생님용 화면: 로그인 → 대시보드 · 신고 관리 · 지도. 신고 상태 변경, 담당자, 처리 기록.
+# 화면 틀(pages.py)과 꾸미기(theme.py)를 먼저 그린다 — 아래 코드가 그 요소들을 찾기 때문
+import pages
+import theme
+
+theme.apply()
+pages.mount("teacher")
+
 import asyncio
 import csv
 import io
