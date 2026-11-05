@@ -202,8 +202,9 @@ def on_tap(x, y, target):
             go(b.id)
             return
     # 도면 안을 누르면 그 자리에 바로 위험/불편 신고 (배치도에서는 건물 밖 = 야외)
+    # 도면 둘레의 흰 여백을 누르면 신고 창을 열지 않는다
     w, h = viewer.size
-    if not (0 <= x <= w and 0 <= y <= h):
+    if not (0 <= x <= w and 0 <= y <= h) or not viewer.on_drawing(x, y, target):
         if state["mode"] == "report":
             toast("도면 안쪽을 눌러주세요")
         return

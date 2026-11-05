@@ -68,7 +68,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=19` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=20` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -131,6 +131,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 | 버전 | 내용 |
 |---|---|
 | v2.3.2 | 캠퍼스 배치도를 위성사진에 맞게: 대운동장 트랙을 잔디 전체를 감싸는 타원으로, 트랙과 골대 사이 양쪽에 농구장(위에서 본 모양), 트랙과 야외 화장실 사이 나무·벤치, 트랙 밖에 잘못 있던 농구장 삭제, 건축선·인접대지경계선·높이(105.5)·10M 치수선·제목 같은 도면 표시와 트랙 위 옛 선 지우기 |
+| v2.3.3 | 도면 밖 빈 곳을 누르면 위험/불편 신고 창이 뜨지 않음 (도면 선 안쪽을 눌렀을 때만 신고) |
 | v2.3.1 | 홈(캠퍼스 배치도)에서도 확대·이동 가능 |
 | v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |

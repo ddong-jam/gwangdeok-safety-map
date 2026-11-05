@@ -138,6 +138,37 @@ class PlanViewer:
         p = DOMPoint.new(client_x, client_y).matrixTransform(self.svg.getScreenCTM().inverse())
         return p.x, p.y
 
+    def on_drawing(self, x, y, target):
+        """(x, y) 가 도면 그림 위인지: 색칠한 바닥을 눌렀거나, 빈 곳이라도 사방이 도면 선으로 둘러싸여 있으면 안쪽.
+        도면 둘레의 흰 여백을 누르면 False."""
+        if hasattr(target, "closest") and target.closest("#deco"):
+            return True
+        m = self.svg.getScreenCTM()
+        if not m:
+            return False
+        p = DOMPoint.new(x, y).matrixTransform(m)
+        r = self.svg.getBoundingClientRect()
+
+        def hits(px, py):
+            for e in document.elementsFromPoint(px, py):
+                if e.closest and e.closest(".layer-plan"):
+                    return True
+            return False
+
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            d, found = 3, False
+            while True:
+                px, py = p.x + dx * d, p.y + dy * d
+                if not (r.left <= px <= r.right and r.top <= py <= r.bottom):
+                    break
+                if hits(px, py):
+                    found = True
+                    break
+                d += 4
+            if not found:
+                return False
+        return True
+
     def apply(self):
         r = self.svg.getBoundingClientRect()
         x, y, w, h = self.view
