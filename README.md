@@ -68,7 +68,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=17` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=18` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -130,6 +130,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 
 | 버전 | 내용 |
 |---|---|
+| v2.3.1 | 홈(캠퍼스 배치도)에서도 확대·이동 가능 |
 | v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |
 | v2.2.1 | 위험/불편 신고: 도면을 누르면 그 자리에 바로 신고, 위험·불편 중에 고르기 (불편은 보라색 핀), 선생님 화면에 종류 칸·필터·CSV 추가 |

@@ -83,7 +83,7 @@ async def navigate(place, after=None):
     if changed:
         state["loaded"] = place
         try:
-            if not await viewer.load(plan_url(place), locked=place == SITE_ID):
+            if not await viewer.load(plan_url(place), locked=False):  # 캠퍼스 배치도도 확대·이동 (v2.3.1)
                 return
         except Exception as e:
             toast(str(e))
