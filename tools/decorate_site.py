@@ -39,7 +39,7 @@ ERASE = [
 ]
 # 도면 글씨를 지우고 웹 글꼴로 다시 쓰는 곳: (지울 영역, 글자, 가운데 좌표, 크기)
 RETEXT = [((231, 383, 277, 394), "대운동장", (254, 389), 17),
-          ((458, 245, 491, 258), "소운동장", (424, 287), 9)]
+          ((458, 245, 491, 258), "소운동장", (527, 288), 9)]
 FONT = "Pretendard, 'Malgun Gothic', sans-serif"
 
 LINE = {"l": ("#475569", 0.6), "m": ("#1e293b", 1.0), "w": ("#0f172a", 1.7)}  # 색, 화면 px 굵기
@@ -217,20 +217,92 @@ def pond():
     return out, water.buffer(2.5)
 
 
+FLOWER_COLORS = ["#f472b6", "#fb7185", "#facc15", "#fb923c", "#a78bfa", "#ffffff", "#ef4444", "#f9a8d4"]
+
+
+def flowers(area, step, seed, avoid=None):
+    """area 안에 꽃밭(초록 잎 위에 알록달록한 꽃송이)과 작은 덤불을 골고루 흩어 심는다."""
+    rnd = random.Random(seed)
+    x0, y0, x1, y1 = area.bounds
+    out = []
+    y, row = y0 + step / 2, 0
+    while y < y1:
+        x = x0 + step / 2 + (step / 2 if row % 2 else 0)
+        while x < x1:
+            px, py = x + rnd.uniform(-step * .3, step * .3), y + rnd.uniform(-step * .3, step * .3)
+            pt = Point(px, py)
+            if area.contains(pt) and not (avoid and avoid.contains(pt)):
+                if rnd.random() < .7:  # 꽃송이
+                    out.append(f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="{fmt(rnd.uniform(2, 2.8))}" fill="#86c46f"/>')
+                    col = rnd.choice(FLOWER_COLORS)
+                    for k in range(rnd.randint(4, 7)):
+                        a = rnd.uniform(0, math.tau)
+                        d = rnd.uniform(.4, 1.9)
+                        c = col if rnd.random() < .75 else rnd.choice(FLOWER_COLORS)
+                        out.append(f'<circle cx="{fmt(px + d * math.cos(a))}" cy="{fmt(py + d * math.sin(a))}" '
+                                   f'r="{fmt(rnd.uniform(.6, .95))}" fill="{c}"/>')
+                else:  # 작은 덤불
+                    out.append(f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="{fmt(rnd.uniform(1.8, 2.5))}" '
+                               f'fill="{rnd.choice([C["tree"], C["tree2"]])}" fill-opacity=".9"/>')
+            x += step
+        y += step * .87
+        row += 1
+    return out
+
+
+def cherry(cx, cy, r, rnd):
+    """위에서 본 벚꽃나무: 분홍 꽃구름 몇 덩이 + 밝은 꽃잎."""
+    out = []
+    for _ in range(5):
+        a, d = rnd.uniform(0, math.tau), rnd.uniform(0, r * .45)
+        out.append(f'<circle cx="{fmt(cx + d * math.cos(a))}" cy="{fmt(cy + d * math.sin(a))}" '
+                   f'r="{fmt(r * rnd.uniform(.55, .75))}" fill="{rnd.choice(["#f9a8d4", "#f472b6", "#fbcfe8"])}" fill-opacity=".92"/>')
+    for _ in range(7):
+        a, d = rnd.uniform(0, math.tau), rnd.uniform(0, r * .9)
+        out.append(f'<circle cx="{fmt(cx + d * math.cos(a))}" cy="{fmt(cy + d * math.sin(a))}" r="{fmt(r * .12)}" fill="#fff1f7"/>')
+    return out
+
+
+def gate_trees():
+    """수위실(부1동) 오른쪽 빈터: 큰 벚꽃나무와 큰 나무 (위성사진에서 나무가 빽빽한 곳)."""
+    rnd = random.Random(11)
+    area = Polygon([(463, 588), (690, 588), (690, 644), (463, 644)])
+    out = []
+    x0, y0, x1, y1 = area.bounds
+    step = 17
+    y, row = y0 + step / 2, 0
+    while y < y1:
+        x = x0 + step / 2 + (step / 2 if row % 2 else 0)
+        while x < x1:
+            px, py = x + rnd.uniform(-3, 3), y + rnd.uniform(-3, 3)
+            if area.contains(Point(px, py)):
+                if rnd.random() < .65:
+                    out += cherry(px, py, rnd.uniform(7.5, 9.5), rnd)
+                else:
+                    col = C["tree"] if rnd.random() < .5 else C["tree2"]
+                    out.append(f'<circle cx="{fmt(px)}" cy="{fmt(py)}" r="{fmt(rnd.uniform(7, 8.5))}" fill="{col}" fill-opacity=".9"/>')
+            x += step
+        y += step * .87
+        row += 1
+    return out
+
+
 def small_garden():
     x0, y0, x1, y1 = SMALL
     area = box(x0 + 1, y0 + 1, x1 - 1, y1 - 1)
     out = [fill(area, "#d9cfa6")]
     flag, flag_box = taegeuk_flag(486, 237, 40)
     water, water_area = pond()
-    pav, pav_area = pavilion(504, 281, 7.5)
-    # 돌길: 왼쪽 입구 → 태극기 마당 아래 → 정자
-    walk = unary_union([LineString([(x0, 262), (440, 262), (504, 262), (504, 281)]).buffer(2.4),
+    pav, pav_area = pavilion(425, 277, 11)
+    # 돌길: 왼쪽 입구 → 태극기 마당 아래, 길에서 정자로
+    walk = unary_union([LineString([(x0, 262), (504, 262)]).buffer(2.4),
+                        LineString([(425, 262), (425, 270)]).buffer(2.4),
                         flag_box.buffer(2.5)])
     out.append(fill(walk.intersection(area), C["path"]))
     out += flag + water + pav
-    avoid = unary_union([walk, water_area, pav_area, box(405, 280, 444, 294)])
-    out += trees(area.buffer(-2), 10, 2.8, 5, avoid=avoid)
+    avoid = unary_union([walk, water_area, pav_area, box(505, 282, 550, 294)])
+    out += flowers(area.buffer(-2), 7, 5, avoid=avoid)
+    out += trees(area.buffer(-3), 19, 3.4, 9, avoid=avoid.buffer(2))
     return out
 
 
@@ -270,7 +342,8 @@ def row_of_trees(p0, p1, gap, r, seed):
 # ── 실행 ─────────────────────────────────────────
 def main():
     s = open(SITE, encoding="utf-8").read()
-    s = re.sub(r'<g id="deco">.*?</g>', "", s, flags=re.S)
+    # 꾸미기 묶음(deco)은 맨 앞에 있고 바로 뒤에 도면 선(<path class=…>)이 온다. 안에 <g> 가 또 있어도 통째로 지운다
+    s = re.sub(r'<g id="deco">.*?</g>(?=<path class=)', "", s, flags=re.S)
     head = s[: s.index(">", s.index("<svg")) + 1]
     W, H = map(float, re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', head).groups())
 
@@ -371,6 +444,7 @@ def main():
     deco += benches([(x, 574) for x in range(186, 326, 26)] + [(x, 604) for x in range(199, 326, 26)])
     deco += trees(rest, 12, 4.4, 6, avoid=unary_union([box(178, 571, 330, 577), box(191, 601, 330, 607)]))
     deco += row_of_trees((676, 380), (684, 600), 10, 3.6, 4)
+    deco += gate_trees()
     for (x, y) in [(522, 381), (623, 381), (522, 479), (623, 479)]:
         deco.append(f'<circle cx="{x}" cy="{y}" r="4" fill="{C["tree"]}" fill-opacity=".9"/>')
 
