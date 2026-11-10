@@ -89,7 +89,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=26` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=27` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -157,6 +157,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 | v2.5.0 | 학생은 신고할 때만 학교 구글 계정으로 로그인(지도 보기는 로그인 없이) · 선생님 '이 기기에서 로그인 유지(14일)', 비밀번호 5번 틀리면 3분 잠금, 로그아웃 시 서버 로그인도 삭제 · 신고 전 허위 신고 안내문과 '사실대로 신고합니다' 체크 · 장난 제목·욕설·잦은 신고·같은 자리 다시 신고 자동 차단(guard.py + 데이터베이스 규칙) · 선생님이 장난 신고를 반려하고 그 계정(또는 기기) 신고 막기 |
 | v2.5.1 | Supabase 연결(공용 모드): 학생 신고가 선생님 화면에 모임 · 학교 구글 계정(@gwangdeok.net)만 신고 가능 |
 | v2.5.2 | 소운동장: 정자를 왼쪽에 크게, 꽃밭과 나무를 골고루 · 수위실 오른쪽에 큰 벚꽃나무와 나무 |
+| v2.5.3 | 소운동장: 태극기 마당 없애고 돌길(가로 큰길, 둥근 산책길, 가운데 쉼터와 벤치, 디딤돌)을 넣음 |
 | v2.3.1 | 홈(캠퍼스 배치도)에서도 확대·이동 가능 |
 | v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |

@@ -287,20 +287,72 @@ def gate_trees():
     return out
 
 
+def stone_path(line, width, seed, clip=None):
+    """돌을 깐 길: 길 바탕 위에 납작한 돌(포장석) 무늬."""
+    rnd = random.Random(seed)
+    band = line.buffer(width / 2, cap_style=1)
+    if clip is not None:
+        band = band.intersection(clip)
+    out = [fill(band, "#e7dcc3"), f'<path d="{poly_d(band)}" fill="none" stroke="#bfae8a" stroke-width="0.35"/>']
+    n = max(2, int(line.length / 2.6))
+    for k in range(n):
+        p = line.interpolate((k + .5) / n, normalized=True)
+        for off in (-width * .22, width * .22):
+            q = line.interpolate(min(line.length, max(0, line.project(p) + 0.3)))
+            dx, dy = q.x - p.x, q.y - p.y
+            L = math.hypot(dx, dy) or 1
+            nx, ny = -dy / L, dx / L
+            cx, cy = p.x + nx * off + rnd.uniform(-.3, .3), p.y + ny * off + rnd.uniform(-.3, .3)
+            if clip is not None and not clip.buffer(-1.2).contains(Point(cx, cy)):
+                continue
+            out.append(f'<ellipse cx="{fmt(cx)}" cy="{fmt(cy)}" rx="{fmt(rnd.uniform(.85, 1.15))}" ry="{fmt(rnd.uniform(.65, .9))}" '
+                       f'fill="{rnd.choice(["#cfc3a8", "#d8cdb4", "#c6b998"])}" stroke="#a8977a" stroke-width="0.2"/>')
+    return out, band
+
+
+def stepping_stones(points, seed):
+    """디딤돌: 꽃밭 사이에 띄엄띄엄 놓인 둥근 돌."""
+    rnd = random.Random(seed)
+    out, geoms = [], []
+    for x, y in points:
+        rx, ry = rnd.uniform(1.6, 2.1), rnd.uniform(1.2, 1.6)
+        out.append(f'<ellipse cx="{fmt(x)}" cy="{fmt(y)}" rx="{fmt(rx)}" ry="{fmt(ry)}" fill="#d6d3d1" stroke="#8a857f" stroke-width="0.3"/>')
+        geoms.append(Point(x, y).buffer(2.4))
+    return out, unary_union(geoms)
+
+
 def small_garden():
     x0, y0, x1, y1 = SMALL
     area = box(x0 + 1, y0 + 1, x1 - 1, y1 - 1)
     out = [fill(area, "#d9cfa6")]
-    flag, flag_box = taegeuk_flag(486, 237, 40)
     water, water_area = pond()
     pav, pav_area = pavilion(425, 277, 11)
-    # 돌길: 왼쪽 입구 → 태극기 마당 아래, 길에서 정자로
-    walk = unary_union([LineString([(x0, 262), (504, 262)]).buffer(2.4),
-                        LineString([(425, 262), (425, 270)]).buffer(2.4),
-                        flag_box.buffer(2.5)])
-    out.append(fill(walk.intersection(area), C["path"]))
-    out += flag + water + pav
-    avoid = unary_union([walk, water_area, pav_area, box(505, 282, 550, 294)])
+    # 돌길: 가로 큰길 + 위쪽 둥근 산책길 + 이어주는 길 + 가운데 작은 쉼터
+    lines = [
+        LineString([(x0, 262), (x1, 262)]),                                   # 가로 큰길
+        LineString([(425, 262), (425, 268)]),                                 # 큰길 → 정자
+        LineString([(476 + 42 * math.cos(t / 40 * math.tau), 236 + 17 * math.sin(t / 40 * math.tau))
+                    for t in range(41)]),                                     # 둥근 산책길
+        LineString([(476, 253), (476, 262)]),                                 # 산책길 ↔ 큰길
+        LineString([(418, 236), (434, 236)]),                                 # 왼쪽 문 → 산책길
+        LineString([(518, 236), (x1, 236)]),                                  # 산책길 → 오른쪽
+        LineString([(476, y0), (476, 219)]),                                  # 위쪽 문 → 산책길
+        LineString([(x0, 236), (418, 236)]),
+    ]
+    walk_geoms = []
+    for k, ln in enumerate(lines):
+        o, g = stone_path(ln, 4.6 if k == 0 else 3.6, 20 + k, clip=area)
+        out += o
+        walk_geoms.append(g)
+    plaza = Point(476, 236).buffer(7)
+    out += [fill(plaza, "#e7dcc3"), f'<circle cx="476" cy="236" r="7" fill="none" stroke="#bfae8a" stroke-width="0.4"/>',
+            f'<circle cx="476" cy="236" r="3.2" fill="#86c46f"/>', f'<circle cx="476" cy="236" r="1.6" fill="#f472b6"/>']
+    out += benches([(476, 226.5), (476, 245.5)], w=6, h=2)
+    # 디딤돌: 큰길 → 연못가, 큰길 → 오른쪽 아래
+    st, st_area = stepping_stones([(497, 266.5), (500, 271), (504, 275.5), (529, 266.5), (532, 271.5)], 31)
+    out += water + st + pav
+    walk = unary_union(walk_geoms + [plaza])
+    avoid = unary_union([walk.buffer(.6), water_area, pav_area, st_area, box(505, 282, 550, 294)])
     out += flowers(area.buffer(-2), 7, 5, avoid=avoid)
     out += trees(area.buffer(-3), 19, 3.4, 9, avoid=avoid.buffer(2))
     return out
