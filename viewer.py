@@ -65,6 +65,7 @@ class PlanViewer:
         self._drag = None
         self._pinch = None
         self._raf = None
+        self._raf_proxy = create_proxy(self._run_raf)  # 한 번만 만들어 계속 쓴다 (끌 때마다 새로 만들지 않게)
         self._bind()
         ResizeObserver.new(create_proxy(lambda *a: self.fit() if self.locked else self.apply())).observe(svg)
 
@@ -221,10 +222,11 @@ class PlanViewer:
 
     def _schedule(self):
         if self._raf is None:
-            def run(*_):
-                self._raf = None
-                self.apply()
-            self._raf = window.requestAnimationFrame(create_proxy(run))
+            self._raf = window.requestAnimationFrame(self._raf_proxy)
+
+    def _run_raf(self, *_):
+        self._raf = None
+        self.apply()
 
     # ── 마우스 · 손가락 ──
     def _bind(self):

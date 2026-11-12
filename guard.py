@@ -15,10 +15,12 @@ LIMITS = {
     "min_fill_sec": 4,   # 신고 창을 열고 4초 안에 접수하면 다시 확인
 }
 
-# 신고 글에 쓰면 안 되는 말 (띄어쓰기를 빼고, 영어는 소문자로 바꿔서 찾는다)
+# 신고 글에 쓰면 안 되는 말 (영어는 소문자로 바꿔서 찾는다)
+# 띄어쓰기는 그대로 두고 찾는다: 띄어쓰기를 빼면 "다시 발생", "유리병 신고", "아저씨 바쁘셔서" 같은
+# 멀쩡한 글이 막힌다. "불이 꺼져 있어요" 처럼 신고에 흔히 쓰는 말(꺼져)은 목록에 넣지 않는다.
 BAD_WORDS = [
     "씨발", "시발", "씨바", "ㅅㅂ", "ㅆㅂ", "병신", "ㅂㅅ", "븅신", "개새끼", "개새", "좆", "존나", "졸라",
-    "지랄", "ㅈㄹ", "미친놈", "미친년", "닥쳐", "꺼져", "느금", "니애미", "엠창", "애미", "애비",
+    "지랄", "ㅈㄹ", "미친놈", "미친년", "닥쳐", "느금", "니애미", "엠창", "애미", "애비",
     "섹스", "야동", "fuck", "shit", "bitch",
 ]
 
@@ -32,7 +34,7 @@ MESSAGES = {
     "dup": "같은 자리를 방금 신고했어요. 선생님이 확인할 때까지 기다려 주세요.",
     "fast": "내용을 한 번 더 확인하고 접수해 주세요.",
     "device": "다시 시도해 주세요. (기기 정보를 만들지 못했어요)",
-    "login": "학교 구글 계정으로 로그인한 뒤에 신고할 수 있어요.",
+    "login": "구글 계정으로 로그인한 뒤에 신고할 수 있어요.",
     "domain": "학교 구글 계정으로 로그인해 주세요.",
 }
 
@@ -49,7 +51,7 @@ def check_text(title, desc="", spot="", reporter="") -> str | None:
     t = squash(title)
     if len(t) < 4 or re.search(REPEAT, t) or len(re.findall(MEANINGFUL, t)) < 3:
         return MESSAGES["title"]
-    allt = squash(title, desc, spot, reporter)
+    allt = " ".join(x or "" for x in (title, desc, spot, reporter)).lower()
     if any(w in allt for w in BAD_WORDS):
         return MESSAGES["bad"]
     return None

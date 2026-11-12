@@ -12,4 +12,4 @@ TEACHER_EMAIL = ""
 # 공용 모드에서는 Supabase → Authentication → Providers → Google 을 켜야 한다 (README 참고).
 STUDENT_LOGIN = True
 # 학교 구글 계정 도메인 (예: "gwangdeok.hs.kr"). 넣으면 그 도메인 계정만 신고할 수 있다. 비우면 아무 구글 계정.
-SCHOOL_EMAIL_DOMAIN = "gwangdeok.net"
+SCHOOL_EMAIL_DOMAIN = ""

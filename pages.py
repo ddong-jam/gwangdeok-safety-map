@@ -116,7 +116,7 @@ STUDENT = '''
     <header class="sheet-head">
       <div>
         <p class="eyebrow">위험/불편 신고</p>
-        <h2>학교 구글 계정으로 로그인</h2>
+        <h2 id="loginTitle">구글 계정으로 로그인</h2>
       </div>
       <button class="icon-btn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
     </header>

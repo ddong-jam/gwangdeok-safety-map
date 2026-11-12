@@ -28,6 +28,17 @@ class StoreError(Exception):
     pass
 
 
+NO_NET = "서버에 연결하지 못했어요. 인터넷을 확인하고 다시 해 주세요."
+
+
+async def _fetch(url, **kw):
+    """pyfetch 와 같지만, 인터넷이 끊겨 연결조차 못 하면 StoreError 로 알린다 (화면이 멈추지 않게)."""
+    try:
+        return await pyfetch(url, **kw)
+    except Exception:
+        raise StoreError(NO_NET)
+
+
 def _get(storage, key):
     try:
         return getattr(window, storage).getItem(key)
@@ -232,7 +243,7 @@ class SupabaseStore:
         if not s:
             return None
         if s["expires_at"] - time.time() < 120:  # 2분 안에 끝나면 미리 새로 받는다
-            res = await pyfetch(self.url + "/auth/v1/token?grant_type=refresh_token", method="POST",
+            res = await _fetch(self.url + "/auth/v1/token?grant_type=refresh_token", method="POST",
                                 headers={"apikey": self.key, "Content-Type": "application/json"},
                                 body=json.dumps({"refresh_token": s["refresh_token"]}))
             if not res.ok:
@@ -257,7 +268,7 @@ class SupabaseStore:
         headers = {"apikey": self.key, "Authorization": f"Bearer {token or self.key}", "Content-Type": "application/json"}
         if prefer:
             headers["Prefer"] = prefer
-        res = await pyfetch(self.url + path, method=method, headers=headers,
+        res = await _fetch(self.url + path, method=method, headers=headers,
                             body=json.dumps(body, ensure_ascii=False) if body is not None else None)
         if res.status == 401 and auth:
             (self.teacher_session if auth == "teacher" else self.student_session).clear()
@@ -294,8 +305,11 @@ class SupabaseStore:
             return window.decodeURIComponent(params.get("error_description", "로그인을 취소했어요").replace("+", " "))
         if "access_token" not in params:
             return "로그인하지 못했어요."
-        res = await pyfetch(self.url + "/auth/v1/user", headers={"apikey": self.key,
-                                                                 "Authorization": f"Bearer {params['access_token']}"})
+        try:
+            res = await _fetch(self.url + "/auth/v1/user", headers={"apikey": self.key,
+                                                                    "Authorization": f"Bearer {params['access_token']}"})
+        except StoreError as e:
+            return str(e)
         if not res.ok:
             return "로그인하지 못했어요."
         user = await res.json()
@@ -339,7 +353,7 @@ class SupabaseStore:
 
     # 선생님
     async def login(self, email, password, keep=False):
-        res = await pyfetch(self.url + "/auth/v1/token?grant_type=password", method="POST",
+        res = await _fetch(self.url + "/auth/v1/token?grant_type=password", method="POST",
                             headers={"apikey": self.key, "Content-Type": "application/json"},
                             body=json.dumps({"email": email, "password": password}))
         if not res.ok:

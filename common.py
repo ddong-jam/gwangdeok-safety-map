@@ -113,6 +113,7 @@ def is_open(r):
 
 # ── 알림 · 파일 ───────────────────────────────────
 _toast_timer = [None]
+_hide_toast = create_proxy(lambda: q("#toast").classList.remove("show"))  # 한 번만 만들어 계속 쓴다
 
 
 def toast(msg):
@@ -121,7 +122,7 @@ def toast(msg):
     t.classList.add("show")
     if _toast_timer[0]:
         window.clearTimeout(_toast_timer[0])
-    _toast_timer[0] = window.setTimeout(create_proxy(lambda: t.classList.remove("show")), 2200)
+    _toast_timer[0] = window.setTimeout(_hide_toast, 2200)
 
 
 def download(filename, text, mime="text/plain"):

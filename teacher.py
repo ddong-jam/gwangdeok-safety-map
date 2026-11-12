@@ -294,17 +294,23 @@ on(q("#fSearch"), "input", lambda e: render_table())
 on(q("#reportTable"), "click", lambda e: open_detail(closest(e, "tr[data-id]").dataset.id) if closest(e, "tr[data-id]") else None)
 
 
+def csv_cell(v):
+    """엑셀이 =, +, -, @ 로 시작하는 칸을 수식으로 실행하지 않게 앞에 ' 를 붙인다 (학생이 쓴 글이 들어가므로)."""
+    s = str(v if v is not None else "")
+    return "'" + s if s.lstrip()[:1] in ("=", "+", "-", "@") else s
+
+
 def export_csv(e):
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["접수일시", "종류", "위험도", "상태", "제목", "위치", "정확한 장소", "유형", "내용", "신고자", "담당자", "처리일시", "사진"])
     for r in state["rows"]:
-        w.writerow([fmt_time(r["created_at"]), KINDS[kind_of(r)][0], SEVERITIES.get(r["severity"], ("",))[0], STATUSES.get(r["status"], r["status"]),
+        w.writerow(csv_cell(c) for c in [fmt_time(r["created_at"]), KINDS[kind_of(r)][0], SEVERITIES.get(r["severity"], ("",))[0], STATUSES.get(r["status"], r["status"]),
                     r["title"], place_name(r["map"]), r.get("spot") or "", category_name(r["category"]),
                     r.get("description") or "", r.get("reporter") or "", r.get("assignee") or "",
                     fmt_time(r.get("resolved_at")) if r.get("resolved_at") else "", "있음" if r.get("has_photo") else ""])
-    # ﻿: 엑셀에서 한글이 깨지지 않게
-    download(f"위험불편신고_{datetime.now(KST):%Y%m%d}.csv", "﻿" + buf.getvalue(), "text/csv")
+    # \ufeff: 엑셀에서 한글이 깨지지 않게
+    download(f"위험불편신고_{datetime.now(KST):%Y%m%d}.csv", "\ufeff" + buf.getvalue(), "text/csv")
 
 
 on(q("#btnCsv"), "click", export_csv)

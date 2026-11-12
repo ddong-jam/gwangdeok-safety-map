@@ -118,8 +118,9 @@ declare
   who_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
   provider  text := coalesce(auth.jwt() -> 'app_metadata' ->> 'provider', '');
   t   text := regexp_replace(lower(coalesce(new.title, '')), '\s', '', 'g');
-  all_text text := regexp_replace(lower(coalesce(new.title, '') || coalesce(new.description, '') ||
-                                        coalesce(new.spot, '') || coalesce(new.reporter, '')), '\s', '', 'g');
+  -- 욕설은 띄어쓰기를 그대로 두고 찾는다 ("다시 발생" 같은 글이 막히지 않게, guard.py 와 같다)
+  all_text text := lower(coalesce(new.title, '') || ' ' || coalesce(new.description, '') || ' ' ||
+                         coalesce(new.spot, '') || ' ' || coalesce(new.reporter, ''));
 begin
   -- 학생 구글 로그인 (config.py 의 STUDENT_LOGIN · SCHOOL_EMAIL_DOMAIN)
   new.reporter_uid := who_uid;

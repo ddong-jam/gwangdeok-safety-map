@@ -313,6 +313,7 @@ def show_who():
 
 def open_login():
     q("#demoNameField").hidden = SHARED
+    q("#loginTitle").textContent = "학교 구글 계정으로 로그인" if SCHOOL_DOMAIN else "구글 계정으로 로그인"
     dom = q("#loginDomain")
     dom.hidden = not SCHOOL_DOMAIN
     dom.innerHTML = f"<b>@{esc(SCHOOL_DOMAIN)}</b> 학교 계정만 신고할 수 있어요." if SCHOOL_DOMAIN else ""
@@ -630,7 +631,8 @@ on(search_input, "keydown", on_search_key)
 on(search_input, "focus", lambda e: show_results(search(search_input.value)))
 on(search_list, "pointerdown", lambda e: e.preventDefault())  # 누르는 동안 입력창 포커스 유지
 on(search_list, "click", on_result_click)
-on(search_input, "blur", lambda e: window.setTimeout(create_proxy(lambda: setattr(search_list, "hidden", True)), 150))
+_hide_results = create_proxy(lambda: setattr(search_list, "hidden", True))  # 한 번만 만들어 계속 쓴다
+on(search_input, "blur", lambda e: window.setTimeout(_hide_results, 150))
 
 
 # ── 시작 ─────────────────────────────────────────
