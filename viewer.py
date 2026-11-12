@@ -106,8 +106,10 @@ class PlanViewer:
                     b = e.getBBox()
                     if b.width * b.height == 0 and b.width + b.height == 0:
                         continue
-                    if b.x >= cx0 - 1 and b.x + b.width <= cx1 + 1:
-                        xs += [b.x, b.x + b.width]
+                    # 경계에 걸친 그림(복도·바깥 벽처럼 두 건물에 이어진 것)도 잘린 부분만큼 센다
+                    lx, rx = max(cx0, b.x), min(cx1, b.x + b.width)
+                    if rx - lx > 0.5 or (b.width == 0 and cx0 <= b.x <= cx1):
+                        xs += [lx, rx]
                         ys += [b.y, b.y + b.height]
                 if xs:
                     x0, x1 = max(cx0, min(xs)), min(cx1, max(xs))

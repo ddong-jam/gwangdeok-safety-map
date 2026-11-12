@@ -90,7 +90,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=33` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=34` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -164,6 +164,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 | v2.5.6 | 선생님 공용 계정 이메일 설정 |
 | v2.6.0 | 공감 "🙋 나도 봤어요": 이미 신고된 곳은 다시 신고하지 않고 공감(계정당 한 번, 로그인 필요) · 학생 목록에 공감 수 · 선생님 표에 공감 칸, 같은 위험도는 공감 많은 순, CSV 에 공감 수 (데이터베이스 SQL 다시 실행 필요) |
 | v2.6.1 | 처음 여는 동안 보이는 준비 화면에 진행 단계와 사용 방법 안내(학생 5가지 · 선생님 5가지)가 번갈아 나옴 |
+| v2.6.2 | 귀촌관(·덕후재)을 처음 열 때 너무 확대되던 문제 수정: 경계에 걸친 복도·벽도 화면 맞춤 계산에 넣음 |
 | v2.3.1 | 홈(캠퍼스 배치도)에서도 확대·이동 가능 |
 | v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |
