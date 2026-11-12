@@ -6,7 +6,7 @@ SUPABASE_URL = "https://bxideaygpolfmfwxrjzo.supabase.co"        # 예: "https:/
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4aWRlYXlncG9sZm1md3hyanpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4ODE5NjcsImV4cCI6MjEwOTQ1Nzk2N30.8V1IOQ_Qfyvf7jsrtQdYcnfZS0UoDuGArhGoDjQk5FQ"   # Project Settings → API → anon public 키 (공개용 키라 올려도 됨)
 # 선생님들이 계정 하나를 같이 쓸 때 그 이메일. 넣으면 로그인 화면에 이메일 칸 없이 이름 + 비밀번호만 나온다.
 # 비워두면 선생님마다 자기 이메일·비밀번호로 로그인한다.
-TEACHER_EMAIL = ""
+TEACHER_EMAIL = "gwangdeok.safety@gmail.com"
 
 # 학생도 구글 계정으로 로그인해야 신고할 수 있게 한다 (지도 보기는 로그인 없이 된다).
 # 공용 모드에서는 Supabase → Authentication → Providers → Google 을 켜야 한다 (README 참고).
