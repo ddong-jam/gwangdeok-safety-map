@@ -10,10 +10,48 @@
   <link rel="stylesheet" href="https://pyscript.net/releases/2024.11.1/core.css" />
   <script type="module" src="https://pyscript.net/releases/2024.11.1/core.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3l11 4v8c0 7-5 12-11 14C10 27 5 22 5 15V7z' fill='%232563eb'/%3E%3C/svg%3E" />
+  <style>
+    /* 처음 열 때 파이썬이 준비되는 동안 보이는 화면 (theme.py 보다 먼저 보여서 여기에 둔다) */
+    #loading { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px;
+      background: #f6f8fb; font-family: Pretendard, system-ui, sans-serif; color: #1e293b; }
+    #loading .ld-box { width: min(380px, 100%); text-align: center; }
+    #loading .ld-pin { width: 56px; height: 56px; margin: 0 auto 14px; animation: ld-bob 1.4s ease-in-out infinite; }
+    #loading .ld-pin svg { width: 100%; height: 100%; }
+    #loading h1 { margin: 0; font-size: 21px; letter-spacing: -0.02em; }
+    #loading .ld-sub { margin: 6px 0 18px; color: #64748b; font-size: 14px; }
+    #loading .ld-bar { height: 6px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
+    #loading .ld-bar i { display: block; height: 100%; width: 40%; border-radius: inherit; background: #2563eb; animation: ld-run 1.6s ease-in-out infinite; }
+    #loading .ld-step { position: relative; margin: 10px 0 0; height: 1.4em; font-size: 13px; color: #64748b; }
+    #loading .ld-step span { position: absolute; inset: 0; opacity: 0; animation: ld-once 3.5s linear both; }
+    #loading .ld-step span.last { animation: ld-stay .4s linear both; }
+    #loading .ld-tips { position: relative; margin-top: 22px; height: 104px; }
+    #loading .ld-tip { position: absolute; inset: 0; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid #e2e8f0;
+      text-align: left; font-size: 14px; line-height: 1.55; opacity: 0; animation: ld-cycle 17.5s linear infinite; }
+    #loading .ld-tip b { display: block; margin-bottom: 4px; font-size: 12.5px; color: #2563eb; }
+    #loading .ld-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+    #loading .ld-dots span { width: 6px; height: 6px; border-radius: 50%; background: #cbd5e1; animation: ld-dot 17.5s linear infinite; }
+    @keyframes ld-cycle { 0% { opacity: 0; } 1.6% { opacity: 1; } 18.4% { opacity: 1; } 20.0%, 100% { opacity: 0; } }
+    @keyframes ld-dot { 0%, 20.0% { background: #475569; } 20.1%, 100% { background: #cbd5e1; } }
+    @keyframes ld-once { 0% { opacity: 0; } 8%, 92% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes ld-stay { to { opacity: 1; } }
+    @keyframes ld-bob { 50% { transform: translateY(-6px); } }
+    @keyframes ld-run { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+    @media (prefers-reduced-motion: reduce) { #loading .ld-pin, #loading .ld-bar i { animation: none; } }
+  </style>
 </head>
 <body>
   <!-- 화면은 모두 파이썬이 그린다: 틀 pages.py · 꾸미기 theme.py · 동작 teacher.py -->
-  <div id="loading">관리 화면 준비 중… (처음엔 5~10초 걸려요)</div>
-  <script type="py" src="./teacher.py?v=31" config='{"files": {"./campus.py?v=31": "./campus.py", "./common.py?v=31": "./common.py", "./store.py?v=31": "./store.py", "./viewer.py?v=31": "./viewer.py", "./config.py?v=31": "./config.py", "./pages.py?v=31": "./pages.py", "./theme.py?v=31": "./theme.py", "./rooms.py?v=31": "./rooms.py", "./guard.py?v=31": "./guard.py"}}'></script>
+  <div id="loading" role="status" aria-live="polite">
+    <div class="ld-box">
+      <div class="ld-pin"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 30c-1-4-10-9-10-17a10 10 0 0 1 20 0c0 8-9 13-10 17z" fill="#2563eb"/><circle cx="16" cy="13" r="4" fill="white"/></svg></div>
+      <h1>광덕 안전지도 · 관리</h1>
+      <p class="ld-sub">학생 신고를 확인하고 처리 상태를 바꿔요</p>
+      <div class="ld-bar"><i></i></div>
+      <p class="ld-step"><span style="animation-delay:0.0s">관리 화면을 여는 중…</span><span style="animation-delay:3.5s">신고 목록을 불러오는 중…</span><span style="animation-delay:7.0s">건물별 통계를 계산하는 중…</span><span class="last" style="animation-delay:10.5s">거의 다 됐어요!</span></p>
+      <div class="ld-tips"><div class="ld-tip" style="animation-delay:0.0s"><b>한눈에 보기</b>첫 화면에서 처리 전 신고, 긴급 신고, 건물·유형별 그래프를 바로 확인할 수 있어요.</div><div class="ld-tip" style="animation-delay:3.5s"><b>처리 순서</b>목록은 위험도가 높은 순, 같은 위험도에서는 🙋 공감이 많은 순으로 정렬돼요.</div><div class="ld-tip" style="animation-delay:7.0s"><b>상태 바꾸기</b>신고를 누르면 접수 / 처리중 / 처리 완료 / 반려로 바꿀 수 있고, 바꾼 기록이 자동으로 남아요.</div><div class="ld-tip" style="animation-delay:10.5s"><b>장난 신고</b>반려한 뒤 그 계정(또는 기기)의 신고를 막을 수 있어요. 막은 목록은 다시 풀 수 있어요.</div><div class="ld-tip" style="animation-delay:14.0s"><b>자료 내보내기</b>CSV 로 내려받아 엑셀에서 열면 수리 계획이나 예산 자료로 쓸 수 있어요.</div></div>
+      <div class="ld-dots"><span style="animation-delay:0.0s"></span><span style="animation-delay:3.5s"></span><span style="animation-delay:7.0s"></span><span style="animation-delay:10.5s"></span><span style="animation-delay:14.0s"></span></div>
+    </div>
+  </div>
+  <script type="py" src="./teacher.py?v=33" config='{"files": {"./campus.py?v=33": "./campus.py", "./common.py?v=33": "./common.py", "./store.py?v=33": "./store.py", "./viewer.py?v=33": "./viewer.py", "./config.py?v=33": "./config.py", "./pages.py?v=33": "./pages.py", "./theme.py?v=33": "./theme.py", "./rooms.py?v=33": "./rooms.py", "./guard.py?v=33": "./guard.py"}}'></script>
 </body>
 </html>
