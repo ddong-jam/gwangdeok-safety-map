@@ -168,10 +168,62 @@ $$;
 drop trigger if exists check_report on public.reports;
 create trigger check_report before insert on public.reports for each row execute function public.check_report();
 
+-- ── 공감 "나도 봤어요" (v2.6.0) ──────────────────
+-- 한 계정이 한 신고에 한 번만. 누가 눌렀는지는 공개하지 않고 개수만 보여준다.
+create table if not exists public.report_likes (
+  report_id  uuid not null references public.reports (id) on delete cascade,
+  uid        uuid not null default auth.uid(),
+  created_at timestamptz not null default now(),
+  primary key (report_id, uid)
+);
+alter table public.report_likes enable row level security;
+revoke all on public.report_likes from anon, authenticated;
+grant select on public.report_likes to authenticated;
+drop policy if exists "내 공감 보기" on public.report_likes;
+create policy "내 공감 보기" on public.report_likes for select to authenticated using (uid = auth.uid() or public.is_admin());
+
+-- 공감 누르기/취소 (로그인한 학생만, 내 신고·처리 끝난 신고는 안 됨). 결과: {"liked": true/false, "likes": 개수}
+create or replace function public.toggle_like(rid uuid) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  r  public.reports%rowtype;
+  on_now boolean;
+begin
+  if me is null then
+    raise exception '신고: 로그인한 뒤에 공감할 수 있어요.';
+  end if;
+  select * into r from public.reports where id = rid;
+  if not found then
+    raise exception '신고: 없어진 신고예요.';
+  end if;
+  if r.reporter_uid = me then
+    raise exception '신고: 내가 한 신고에는 공감할 수 없어요.';
+  end if;
+  if exists (select 1 from public.blocked_devices b where b.device = me::text) then
+    raise exception '신고: {MSG_blocked}';
+  end if;
+  if exists (select 1 from public.report_likes where report_id = rid and uid = me) then
+    delete from public.report_likes where report_id = rid and uid = me;
+    on_now := false;
+  else
+    if r.status not in ('new', 'doing') then
+      raise exception '신고: 처리가 끝난 신고에는 공감할 수 없어요.';
+    end if;
+    insert into public.report_likes (report_id, uid) values (rid, me);
+    on_now := true;
+  end if;
+  return json_build_object('liked', on_now, 'likes', (select count(*) from public.report_likes where report_id = rid));
+end;
+$$;
+revoke all on function public.toggle_like(uuid) from public, anon;
+grant execute on function public.toggle_like(uuid) to authenticated;
+
 -- ── 학생에게 보이는 신고 (공개 칸만) ──────────────
 -- 뷰는 만든 사람 권한으로 돌아서 위 RLS 와 상관없이 이 칸들만 보여준다
 create or replace view public.public_reports as
-  select id, created_at, map, x, y, category, severity, title, spot, status, kind   -- 새 칸은 맨 뒤에 (기존 뷰를 바꿀 수 있게)
+  select id, created_at, map, x, y, category, severity, title, spot, status, kind,   -- 새 칸은 맨 뒤에 (기존 뷰를 바꿀 수 있게)
+         (select count(*) from public.report_likes l where l.report_id = reports.id)::int as likes
   from public.reports;
 grant select on public.public_reports to anon, authenticated;
 

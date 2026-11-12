@@ -31,6 +31,8 @@ state = {
     "mine": set(),        # 이 화면에서 내가 접수한 신고
     "photo": None,
     "hit": None,          # 검색으로 찾은 곳 (x, y)
+    "liked": set(),       # 내가 공감한 신고
+    "like_after": None,   # 로그인을 마치면 공감할 신고
 }
 viewer = PlanViewer(q("#map"))
 
@@ -50,6 +52,7 @@ def floors_of(b):
 async def refresh_reports():
     try:
         state["reports"] = await store.list_public()
+        state["liked"] = await store.my_likes() if store.student else set()
     except StoreError as e:
         toast(str(e))
 
@@ -175,9 +178,14 @@ def render_list():
         sel = " is-selected" if r["id"] == state["selected"] else ""
         spot = f' · {esc(r["spot"])}' if r.get("spot") else ""
         rows.append(f'<li><button class="report-item{sel}" data-id="{r["id"]}" type="button">'
-                    f'<span class="sev-dot">{dot}</span><span class="t">{kind_badge(r)} {esc(r["title"])}</span>{status_badge(r["status"])}'
+                    f'<span class="sev-dot">{dot}</span><span class="t">{kind_badge(r)} {esc(r["title"])}{like_badge(r)}</span>{status_badge(r["status"])}'
                     f'<span class="w">{esc(place_name(r["map"]))}{spot} · {time_ago(r["created_at"])}</span></button></li>')
     q("#reportList").innerHTML = "".join(rows)
+
+
+def like_badge(r):
+    n = r.get("likes") or 0
+    return f' <span class="like-count" title="나도 봤어요 {n}명">🙋{n}</span>' if n else ""
 
 
 def render_all():
@@ -311,7 +319,8 @@ def show_who():
                                       else "신고하면 시간과 이 기기 정보가 함께 기록돼요. (익명이어도 기록돼요)")
 
 
-def open_login():
+def open_login(purpose="신고"):
+    q("#loginPurpose").textContent = "나도 봤어요" if purpose == "like" else "위험/불편 신고"
     q("#demoNameField").hidden = SHARED
     q("#loginTitle").textContent = "학교 구글 계정으로 로그인" if SCHOOL_DOMAIN else "구글 계정으로 로그인"
     dom = q("#loginDomain")
@@ -321,6 +330,8 @@ def open_login():
 
 
 def on_login_close(e):
+    if not store.student:
+        state["like_after"] = None
     if not (STUDENT_LOGIN and store.student) and not form_dialog.open:
         set_draft(None)
 
@@ -329,11 +340,17 @@ async def on_google(e):
     if not SHARED:  # 체험 모드: 구글 대신 이름만
         name = str(q("#demoName").value).strip() or "체험 학생"
         await store.student_login(name)
+        rid, state["like_after"] = state["like_after"], None
         login_dialog.close()
-        open_form()
+        if rid:
+            await refresh_reports()
+            await do_like(rid)
+        else:
+            open_form()
         return
     # 구글에 다녀오면 페이지가 새로 열리니, 보던 층과 찍은 자리를 기억해 둔다
-    window.sessionStorage.setItem(PENDING_KEY, json.dumps({"place": state["place"], "draft": state["draft"]}))
+    window.sessionStorage.setItem(PENDING_KEY, json.dumps({"place": state["place"], "draft": state["draft"],
+                                                           "like": state["like_after"]}))
     back = window.location.origin + window.location.pathname
     window.location.href = store.google_url(back)
 
@@ -472,6 +489,16 @@ def open_detail(rid):
     else:
         note = "이미 신고된 곳이에요. 같은 문제라면 다시 신고하지 않아도 돼요."
     spot = f'<dt>정확한 장소</dt><dd>{esc(r["spot"])}</dd>' if r.get("spot") else ""
+    n = r.get("likes") or 0
+    liked = rid in state["liked"]
+    if mine:
+        like = f'<p class="like-line">🙋 나도 봤어요 <b>{n}</b>명</p>' if n else ""
+    elif is_open(r) or liked:
+        like = (f'<button class="btn like-btn{" is-on" if liked else ""}" type="button" id="btnLike" aria-pressed="{str(liked).lower()}">'
+                f'🙋 나도 봤어요 <b>{n}</b></button>'
+                f'<p class="hint">같은 문제를 봤다면 다시 신고하지 말고 눌러 주세요. 많이 눌린 신고부터 처리해요.</p>')
+    else:
+        like = f'<p class="like-line">🙋 나도 봤어요 <b>{n}</b>명</p>' if n else ""
     q("#detailBody").innerHTML = f"""
       <header class="sheet-head">
         <div><p class="eyebrow">{kind_badge(r)} {severity_badge(r["severity"])} · {esc(category_name(r["category"]))}</p>
@@ -485,15 +512,49 @@ def open_detail(rid):
           <dt>신고 일시</dt><dd>{fmt_time(r["created_at"])}</dd>
         </dl>
         <p class="hint">{note}</p>
+        {like}
       </div>
       <footer class="sheet-foot"><button class="btn btn-quiet" type="button" data-close>닫기</button></footer>"""
     for b in detail_dialog.querySelectorAll("[data-close]"):
         on(b, "click", lambda e: detail_dialog.close())
+    btn = q("#btnLike")
+    if btn:
+        on(btn, "click", lambda e: asyncio.ensure_future(on_like(rid)))
     if not detail_dialog.open:
         detail_dialog.showModal()
 
 
 on(detail_dialog, "click", lambda e: detail_dialog.close() if e.target == detail_dialog else None)
+
+
+# ── 공감 "나도 봤어요" ─────────────────────────────
+async def on_like(rid):
+    if not store.student:  # 공감도 한 사람이 한 번만 누르게 로그인한다
+        state["like_after"] = rid
+        detail_dialog.close()
+        open_login("like")
+        return
+    await do_like(rid)
+
+
+async def do_like(rid):
+    btn = q("#btnLike")
+    if btn:
+        btn.disabled = True
+    try:
+        res = await store.toggle_like(rid)
+    except StoreError as e:
+        toast(str(e))
+        if btn:
+            btn.disabled = False
+        return
+    for r in state["reports"]:
+        if r["id"] == rid:
+            r["likes"] = res["likes"]
+    (state["liked"].add if res["liked"] else state["liked"].discard)(rid)
+    toast("공감했어요. 선생님이 더 빨리 확인할게요!" if res["liked"] else "공감을 취소했어요")
+    render_list()
+    open_detail(rid)
 
 
 def focus_report(r):
@@ -640,7 +701,9 @@ q("#demoNote").hidden = SHARED
 pending = await finish_google_return()
 await refresh_reports()
 await navigate(parse_hash())
-if pending and pending.get("draft") and STUDENT_LOGIN and store.student:
+if pending and pending.get("like") and store.student:
+    await do_like(pending["like"])
+elif pending and pending.get("draft") and STUDENT_LOGIN and store.student:
     set_mode("report")
     set_draft(tuple(pending["draft"]))
     open_form()

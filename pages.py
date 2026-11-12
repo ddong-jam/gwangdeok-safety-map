@@ -115,13 +115,13 @@ STUDENT = '''
   <dialog class="sheet" id="loginDialog">
     <header class="sheet-head">
       <div>
-        <p class="eyebrow">위험/불편 신고</p>
+        <p class="eyebrow" id="loginPurpose">위험/불편 신고</p>
         <h2 id="loginTitle">구글 계정으로 로그인</h2>
       </div>
       <button class="icon-btn" type="button" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
     </header>
     <div class="sheet-body">
-      <p class="login-lead">장난 신고를 막으려고 <b>신고할 때만</b> 로그인해요. 지도와 다른 신고 보기는 로그인 없이 돼요.</p>
+      <p class="login-lead">장난을 막으려고 <b>신고하거나 공감할 때만</b> 로그인해요. 지도와 다른 신고 보기는 로그인 없이 돼요.</p>
       <ul class="login-points">
         <li>누가 신고했는지는 <b>선생님만</b> 볼 수 있어요. 다른 학생에게는 보이지 않아요.</li>
         <li>이 기기에서는 30일 동안 로그인이 유지돼요. 함께 쓰는 컴퓨터라면 신고 뒤 꼭 로그아웃해요.</li>

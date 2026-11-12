@@ -116,6 +116,7 @@ class LocalStore:
     KEY_R = "kd-safety-v2-reports"
     KEY_E = "kd-safety-v2-events"
     KEY_B = "kd-safety-v2-blocked"
+    KEY_L = "kd-safety-v2-likes"
     shared = False
 
     def __init__(self):
@@ -148,7 +149,10 @@ class LocalStore:
 
     # 학생
     async def list_public(self, map_id=None):
-        rows = [{k: r.get(k) for k in PUBLIC_FIELDS} for r in self._load(self.KEY_R)]
+        counts = {}
+        for l in self._load(self.KEY_L):
+            counts[l["report_id"]] = counts.get(l["report_id"], 0) + 1
+        rows = [{k: r.get(k) for k in PUBLIC_FIELDS} | {"likes": counts.get(r["id"], 0)} for r in self._load(self.KEY_R)]
         return [r for r in rows if not map_id or r["map"] == map_id]
 
     async def add(self, report):
@@ -169,6 +173,33 @@ class LocalStore:
         self._save(self.KEY_R, rows)
         return r["id"]
 
+    # 공감 "나도 봤어요" (데이터베이스의 toggle_like() 와 같은 규칙)
+    async def my_likes(self):
+        st = self.student
+        return {l["report_id"] for l in self._load(self.KEY_L) if st and l["uid"] == st["uid"]}
+
+    async def toggle_like(self, rid):
+        st = self.student
+        if not st:
+            raise StoreError("로그인한 뒤에 공감할 수 있어요.")
+        r = next((x for x in self._load(self.KEY_R) if x["id"] == rid), None)
+        if not r:
+            raise StoreError("없어진 신고예요.")
+        if r.get("reporter_uid") == st["uid"]:
+            raise StoreError("내가 한 신고에는 공감할 수 없어요.")
+        if any(b["device"] == st["uid"] for b in self._load(self.KEY_B)):
+            raise StoreError(guard.MESSAGES["blocked"])
+        likes = self._load(self.KEY_L)
+        mine = [l for l in likes if l["report_id"] == rid and l["uid"] == st["uid"]]
+        if mine:
+            likes = [l for l in likes if l not in mine]
+        elif r["status"] not in ("new", "doing"):
+            raise StoreError("처리가 끝난 신고에는 공감할 수 없어요.")
+        else:
+            likes.append({"report_id": rid, "uid": st["uid"], "created_at": now_iso()})
+        self._save(self.KEY_L, likes)
+        return {"liked": not mine, "likes": sum(1 for l in likes if l["report_id"] == rid)}
+
     # 선생님
     async def login(self, email, password, keep=False):
         return True
@@ -182,7 +213,11 @@ class LocalStore:
 
     async def list_all(self):
         rows = self._load(self.KEY_R)
-        return [{k: v for k, v in r.items() if k != "photo"} | {"has_photo": bool(r.get("photo"))} for r in rows]
+        counts = {}
+        for l in self._load(self.KEY_L):
+            counts[l["report_id"]] = counts.get(l["report_id"], 0) + 1
+        return [{k: v for k, v in r.items() if k != "photo"} | {"has_photo": bool(r.get("photo")), "likes": counts.get(r["id"], 0)}
+                for r in rows]
 
     async def get(self, rid):
         return next((r for r in self._load(self.KEY_R) if r["id"] == rid), None)
@@ -351,6 +386,26 @@ class SupabaseStore:
                         auth="student" if self.student else None, prefer="return=minimal")
         return rid
 
+    # 공감 "나도 봤어요" (규칙은 데이터베이스의 toggle_like() 가 지킨다)
+    async def my_likes(self):
+        if not self.student:
+            return set()
+        try:
+            rows = await self._req("GET", "/rest/v1/report_likes?select=report_id", auth="student")
+        except StoreError:
+            return set()
+        return {r["report_id"] for r in rows or []}
+
+    async def toggle_like(self, rid):
+        if not self.student:
+            raise StoreError("로그인한 뒤에 공감할 수 있어요.")
+        try:
+            return await self._req("POST", "/rest/v1/rpc/toggle_like", {"rid": rid}, auth="student")
+        except StoreError as e:
+            if "404" in str(e):
+                raise StoreError("공감 기능을 준비 중이에요. 선생님께 말씀해 주세요.")
+            raise
+
     # 선생님
     async def login(self, email, password, keep=False):
         res = await _fetch(self.url + "/auth/v1/token?grant_type=password", method="POST",
@@ -373,7 +428,12 @@ class SupabaseStore:
 
     async def list_all(self):
         cols = ",".join(f for f in REPORT_FIELDS if f != "photo") + ",has_photo"
-        return await self._req("GET", f"/rest/v1/reports?select={cols}&order=created_at.desc", auth="teacher")
+        rows = await self._req("GET", f"/rest/v1/reports?select={cols}&order=created_at.desc", auth="teacher")
+        try:  # 공감 수는 공개 목록에서 가져온다 (데이터베이스를 v2.6.0 으로 올리기 전이면 0)
+            likes = {r["id"]: r.get("likes") or 0 for r in await self._req("GET", "/rest/v1/public_reports?select=*")}
+        except StoreError:
+            likes = {}
+        return [r | {"likes": likes.get(r["id"], 0)} for r in rows or []]
 
     async def get(self, rid):
         rows = await self._req("GET", f"/rest/v1/reports?select=*&id=eq.{rid}", auth="teacher")

@@ -203,6 +203,11 @@ body.reporting .bld { pointer-events: none; }
 }
 .report-item:hover { border-color: var(--line-2); box-shadow: var(--shadow); }
 .report-item.is-selected { border-color: var(--ink); }
+.like-count { font-size: 12px; font-weight: 600; color: var(--ink-2, #555); margin-left: 4px; white-space: nowrap; }
+.like-btn { width: 100%; margin-top: 12px; justify-content: center; gap: 6px; border: 1.5px solid var(--line-2, #ccc); background: var(--bg, #fff); }
+.like-btn.is-on { border-color: #e8833a; background: #fff3e8; color: #b4541a; }
+.like-btn b { font-variant-numeric: tabular-nums; }
+.like-line { margin-top: 10px; font-size: 14px; }
 .report-item .sev-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; }
 .report-item .t { font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; line-height: 1.35; }
 .report-item .w { grid-column: 2 / 4; font-size: 12.5px; color: var(--muted); }

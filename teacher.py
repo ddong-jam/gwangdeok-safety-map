@@ -269,23 +269,23 @@ def filtered():
             continue
         out.append(r)
     rank = {k: i for i, k in enumerate(SEVERITIES)}
-    # 급한 것 먼저, 같은 위험도는 최근 것 먼저
+    # 급한 것 먼저, 같은 위험도는 공감(나도 봤어요) 많은 것 먼저, 그다음 최근 것 먼저
     out.sort(key=lambda r: r["created_at"], reverse=True)
-    out.sort(key=lambda r: rank.get(r["severity"], 9))
+    out.sort(key=lambda r: (rank.get(r["severity"], 9), -(r.get("likes") or 0)))
     return out
 
 
 def render_table():
     rows = filtered()
     q("#listCount").textContent = f"{len(rows)}건 · 줄을 누르면 자세한 내용과 처리 메뉴가 열려요"
-    head = "<thead><tr><th>접수</th><th>종류</th><th>위험도</th><th>상태</th><th>제목</th><th>위치</th><th>장소</th><th>유형</th><th>담당</th><th>📷</th></tr></thead>"
+    head = "<thead><tr><th>접수</th><th>종류</th><th>위험도</th><th>상태</th><th>제목</th><th>위치</th><th>장소</th><th>유형</th><th>담당</th><th title="나도 봤어요">🙋</th><th>📷</th></tr></thead>"
     body = "".join(
         f'<tr data-id="{r["id"]}" class="{"is-selected" if r["id"] == state["sel"] else ""}">'
         f'<td>{parse_time(r["created_at"]).astimezone(KST):%m-%d %H:%M}</td><td>{kind_badge(r)}</td><td>{severity_badge(r["severity"])}</td>'
         f'<td>{status_badge(r["status"])}</td><td class="title">{esc(r["title"])}</td><td>{esc(place_name(r["map"]))}</td>'
         f'<td>{esc(r.get("spot") or "")}</td><td>{esc(category_name(r["category"]))}</td><td>{esc(r.get("assignee") or "")}</td>'
-        f'<td>{"📷" if r.get("has_photo") else ""}</td></tr>' for r in rows)
-    q("#reportTable").innerHTML = head + f"<tbody>{body or '<tr><td colspan=10 class=t-empty>조건에 맞는 신고가 없어요</td></tr>'}</tbody>"
+        f'<td>{r.get("likes") or ""}</td><td>{"📷" if r.get("has_photo") else ""}</td></tr>' for r in rows)
+    q("#reportTable").innerHTML = head + f"<tbody>{body or '<tr><td colspan=11 class=t-empty>조건에 맞는 신고가 없어요</td></tr>'}</tbody>"
 
 
 for sel in ("#fStatus", "#fKind", "#fSeverity", "#fBuilding"):
@@ -303,12 +303,12 @@ def csv_cell(v):
 def export_csv(e):
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["접수일시", "종류", "위험도", "상태", "제목", "위치", "정확한 장소", "유형", "내용", "신고자", "담당자", "처리일시", "사진"])
+    w.writerow(["접수일시", "종류", "위험도", "상태", "제목", "위치", "정확한 장소", "유형", "내용", "신고자", "담당자", "처리일시", "사진", "나도 봤어요"])
     for r in state["rows"]:
         w.writerow(csv_cell(c) for c in [fmt_time(r["created_at"]), KINDS[kind_of(r)][0], SEVERITIES.get(r["severity"], ("",))[0], STATUSES.get(r["status"], r["status"]),
                     r["title"], place_name(r["map"]), r.get("spot") or "", category_name(r["category"]),
                     r.get("description") or "", r.get("reporter") or "", r.get("assignee") or "",
-                    fmt_time(r.get("resolved_at")) if r.get("resolved_at") else "", "있음" if r.get("has_photo") else ""])
+                    fmt_time(r.get("resolved_at")) if r.get("resolved_at") else "", "있음" if r.get("has_photo") else "", r.get("likes") or 0])
     # \ufeff: 엑셀에서 한글이 깨지지 않게
     download(f"위험불편신고_{datetime.now(KST):%Y%m%d}.csv", "\ufeff" + buf.getvalue(), "text/csv")
 
