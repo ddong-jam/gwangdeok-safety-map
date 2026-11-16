@@ -2,14 +2,14 @@
 # 비워두면 "체험 모드": 신고가 이 브라우저에만 저장된다 (학생용·선생님용 페이지끼리는 같은 브라우저에서 공유됨).
 # 설정 방법은 README.md 의 "신고를 모두 함께 보기" 참고.
 
-SUPABASE_URL = "https://bxideaygpolfmfwxrjzo.supabase.co"        # 예: "https://abcdefgh.supabase.co"
+SUPABASE_URL = "https://bxideaygpolfmfwxrjzo.supabase.co"        # 우리 Supabase 프로젝트 주소 (신고가 저장되는 서버)
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4aWRlYXlncG9sZm1md3hyanpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4ODE5NjcsImV4cCI6MjEwOTQ1Nzk2N30.8V1IOQ_Qfyvf7jsrtQdYcnfZS0UoDuGArhGoDjQk5FQ"   # Project Settings → API → anon public 키 (공개용 키라 올려도 됨)
 # 선생님들이 계정 하나를 같이 쓸 때 그 이메일. 넣으면 로그인 화면에 이메일 칸 없이 이름 + 비밀번호만 나온다.
 # 비워두면 선생님마다 자기 이메일·비밀번호로 로그인한다.
-TEACHER_EMAIL = "gwangdeok.safety@gmail.com"
+TEACHER_EMAIL = "gwangdeok.safety@gmail.com"  # 선생님 공용 계정 이메일
 
 # 학생도 구글 계정으로 로그인해야 신고할 수 있게 한다 (지도 보기는 로그인 없이 된다).
 # 공용 모드에서는 Supabase → Authentication → Providers → Google 을 켜야 한다 (README 참고).
-STUDENT_LOGIN = True
+STUDENT_LOGIN = True  # True = 신고·공감할 때 구글 로그인 필요
 # 학교 구글 계정 도메인 (예: "gwangdeok.hs.kr"). 넣으면 그 도메인 계정만 신고할 수 있다. 비우면 아무 구글 계정.
-SCHOOL_EMAIL_DOMAIN = ""
+SCHOOL_EMAIL_DOMAIN = ""  # 비어 있음 = 아무 구글 계정이나 신고 가능

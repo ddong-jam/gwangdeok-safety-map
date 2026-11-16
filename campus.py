@@ -2,15 +2,15 @@
 
 배치도 좌표는 plans/site.svg 의 단위(pt)이며 원본 전체배치도 PDF에서 추출했다.
 """
-import re
-from dataclasses import dataclass, field
+import re  # 글자 패턴(정규식) 도구 — 검색어 "2학년 1반" 같은 말을 알아보는 데 쓴다
+from dataclasses import dataclass, field  # 층·건물 같은 데이터 묶음을 간단히 만드는 도구
 
-SITE_ID = "site"
+SITE_ID = "site"  # 캠퍼스 전체 배치도의 id
 
 
-@dataclass(frozen=True)
-class Floor:
-    id: str
+@dataclass(frozen=True)  # 아래 클래스를 바꿀 수 없는 데이터 묶음으로 만든다
+class Floor:  # 층 하나의 정보
+    id: str  # 층 id (예: "b2-1f")
     label: str      # 층 버튼에 쓰는 짧은 이름 (1F, B1 ...)
     name: str       # 화면에 쓰는 이름 (1층, 지하 1층 ...)
     area: float | None = None  # 바닥면적 ㎡
@@ -18,245 +18,245 @@ class Floor:
     crop: tuple[float, float] | None = None  # 그 도면에서 이 건물 부분만 보여줄 x 범위
 
 
-@dataclass(frozen=True)
-class Building:
-    id: str
-    name: str
-    sub: str
-    dong: str
-    code: str
-    color: str
-    polys: list[list[tuple[float, float]]] = field(default_factory=list)
-    floors: list[Floor] = field(default_factory=list)
+@dataclass(frozen=True)  # 아래 클래스를 바꿀 수 없는 데이터 묶음으로 만든다
+class Building:  # 건물 하나의 정보
+    id: str  # 건물 id (예: "b2")
+    name: str  # 건물 이름 (예: 덕린관)
+    sub: str  # 건물 설명 (예: 고등학교 교사)
+    dong: str  # 동 번호 (예: 2동)
+    code: str  # 도면 기호 (예: 주2)
+    color: str  # 배치도에서 건물 색
+    polys: list[list[tuple[float, float]]] = field(default_factory=list)  # 배치도 위 건물 윤곽 (점 목록들)
+    floors: list[Floor] = field(default_factory=list)  # 이 건물의 층 목록
 
-    @property
-    def default_floor(self) -> Floor:
-        return next((f for f in self.floors if f.label == "1F"), self.floors[0])
+    @property  # 아래 함수를 값처럼 쓸 수 있게 한다
+    def default_floor(self) -> Floor:  # 건물을 눌렀을 때 처음 보여줄 층
+        return next((f for f in self.floors if f.label == "1F"), self.floors[0])  # 1층이 있으면 1층, 없으면 첫 층
 
 
-def _poly(text: str) -> list[tuple[float, float]]:
-    return [tuple(map(float, p.split(","))) for p in text.split()]
+def _poly(text: str) -> list[tuple[float, float]]:  # "x,y x,y ..." 글자를 점 목록으로 바꾸는 함수
+    return [tuple(map(float, p.split(","))) for p in text.split()]  # 띄어쓰기로 점을 나누고, 쉼표로 x·y 를 나눠 숫자로 바꾼다
 
 
 SPLIT_X = 588.5  # 특별교실동 층 도면에서 덕후재 | 귀촌관 경계
 
-BUILDINGS: list[Building] = [
-    Building("b2", "덕린관", "고등학교 교사", "2동", "주2", "#2563eb",
-             [_poly("417.1,315.7 653.2,315.7 653.2,339.3 606,339.3 606,345.7 607.2,345.7 610.8,349.2 610.8,355.2 594.2,355.2 594.2,358.9 547.6,358.9 547.6,351.6 522.7,351.6 522.7,358.9 482.2,358.9 482.2,361 476.1,361 476.1,355.2 459.6,355.2 459.6,349.2 463,345.7 464.2,345.7 464.2,339.3 417.1,339.3")],
-             [Floor("b2-b1", "B1", "지하 1층", 372.63), Floor("b2-1f", "1F", "1층", 1526.08),
-              Floor("b2-2f", "2F", "2층", 1503.34), Floor("b2-3f", "3F", "3층", 1503.34),
-              Floor("b2-4f", "4F", "4층", 1503.34)]),
-    Building("b1", "만대관", "본관", "1동", "주1", "#7c3aed",
-             [_poly("476.1,361 482.2,361 482.2,379.2 483.2,379.2 483.2,414.7 486.7,414.7 491.5,409.9 497.4,409.9 497.4,451.3 483.2,451.3 483.2,498.4 487.9,498.4 487.9,517.4 476.1,517.4 476.1,493.8 464.7,493.8 464.7,486.7 454.9,486.7 454.9,404 447.8,404 447.8,379.2 476.1,379.2")],
-             [Floor("b1-b1", "B1", "지하 1층", 244.47), Floor("b1-1f", "1F", "1층", 741.72),
-              Floor("b1-2f", "2F", "2층", 741.72), Floor("b1-3f", "3F", "3층", 741.72),
-              Floor("b1-4f", "4F", "4층", 912.72), Floor("b1-rf", "RF", "옥상층")]),
-    Building("b4", "중학교 교사", "광덕중학교", "4동", "주3", "#059669",
-             [_poly("457.6,517.4 654.7,517.4 654.7,568.3 632,568.3 632,549.2 629.1,549.2 627.1,547.4 627.1,541 610.8,541 604.9,546.9 608.4,550.4 608.4,557.5 591.8,557.5 591.8,541 574,541 563.4,551.6 529.2,551.6 518.5,541 498.6,541 498.6,557.5 482,557.5 482,550.4 485.6,546.9 485.6,541 457.6,541")],
-             [Floor("b4-1f", "1F", "1층", 1170.95), Floor("b4-2f", "2F", "2층", 1138.39),
-              Floor("b4-3f", "3F", "3층", 1138.39), Floor("b4-4f", "4F", "4층", 1138.39)]),
-    Building("b6", "복지관", "급식실", "6동", "주4", "#d97706",
-             [_poly("633.9,377.6 666.9,377.6 666.9,490.9 633.9,490.9")],
-             [Floor("b6-1f", "1F", "1층", 676.8), Floor("b6-2f", "2F", "2층", 362.16),
-              Floor("b6-l1", "통로1", "연결통로 1층"), Floor("b6-l2", "통로2", "연결통로 2층", 53.01),
-              Floor("b6-lr", "통로R", "연결통로 지붕")]),
-    Building("b3", "단재관", "교사", "3동", "주5", "#0891b2",
-             [_poly("584.7,202.6 600.8,202.6 600.8,260 618.7,260 618.7,281.6 606.6,281.6 606.6,315.7 599.7,315.7 599.7,274.3 577.4,274.3 577.4,210.9 584.7,210.9")],
-             [Floor("b3-b1", "B1", "지하 1층", 151.46), Floor("b3-1f", "1F", "1층", 379.97),
-              Floor("b3-2f", "2F", "2층", 379.97), Floor("b3-3f", "3F", "3층", 345.05),
-              Floor("b3-4f", "4F", "4층", 345.05), Floor("b3-rf", "RF", "옥상층")]),
-    Building("b8", "체육관", "실내체육관", "8동", "주6", "#db2777",
-             [_poly("455.1,41.1 563.1,38.5 565.3,123.4 457.2,126.2")],
-             [Floor("b8-b1", "B1", "지하 1층", 108.0), Floor("b8-1f", "1F", "1층", 1555.8),
-              Floor("b8-2f", "2F", "2층", 693.24), Floor("b8-rf", "RF", "지붕층")]),
+BUILDINGS: list[Building] = [  # 학교 건물 전체 목록 시작
+    Building("b2", "덕린관", "고등학교 교사", "2동", "주2", "#2563eb",  # 덕린관: id·이름·설명·동·기호·색(파랑)
+             [_poly("417.1,315.7 653.2,315.7 653.2,339.3 606,339.3 606,345.7 607.2,345.7 610.8,349.2 610.8,355.2 594.2,355.2 594.2,358.9 547.6,358.9 547.6,351.6 522.7,351.6 522.7,358.9 482.2,358.9 482.2,361 476.1,361 476.1,355.2 459.6,355.2 459.6,349.2 463,345.7 464.2,345.7 464.2,339.3 417.1,339.3")],  # 배치도 위 덕린관 윤곽
+             [Floor("b2-b1", "B1", "지하 1층", 372.63), Floor("b2-1f", "1F", "1층", 1526.08),  # 층: (층 id, 버튼 이름, 화면 이름, 바닥면적)
+              Floor("b2-2f", "2F", "2층", 1503.34), Floor("b2-3f", "3F", "3층", 1503.34),  # 2·3층
+              Floor("b2-4f", "4F", "4층", 1503.34)]),  # 4층
+    Building("b1", "만대관", "본관", "1동", "주1", "#7c3aed",  # 만대관(본관): 보라
+             [_poly("476.1,361 482.2,361 482.2,379.2 483.2,379.2 483.2,414.7 486.7,414.7 491.5,409.9 497.4,409.9 497.4,451.3 483.2,451.3 483.2,498.4 487.9,498.4 487.9,517.4 476.1,517.4 476.1,493.8 464.7,493.8 464.7,486.7 454.9,486.7 454.9,404 447.8,404 447.8,379.2 476.1,379.2")],  # 만대관 윤곽
+             [Floor("b1-b1", "B1", "지하 1층", 244.47), Floor("b1-1f", "1F", "1층", 741.72),  # 지하 1층·1층
+              Floor("b1-2f", "2F", "2층", 741.72), Floor("b1-3f", "3F", "3층", 741.72),  # 2·3층
+              Floor("b1-4f", "4F", "4층", 912.72), Floor("b1-rf", "RF", "옥상층")]),  # 4층·옥상층
+    Building("b4", "중학교 교사", "광덕중학교", "4동", "주3", "#059669",  # 중학교 교사: 초록
+             [_poly("457.6,517.4 654.7,517.4 654.7,568.3 632,568.3 632,549.2 629.1,549.2 627.1,547.4 627.1,541 610.8,541 604.9,546.9 608.4,550.4 608.4,557.5 591.8,557.5 591.8,541 574,541 563.4,551.6 529.2,551.6 518.5,541 498.6,541 498.6,557.5 482,557.5 482,550.4 485.6,546.9 485.6,541 457.6,541")],  # 중학교 윤곽
+             [Floor("b4-1f", "1F", "1층", 1170.95), Floor("b4-2f", "2F", "2층", 1138.39),  # 1·2층
+              Floor("b4-3f", "3F", "3층", 1138.39), Floor("b4-4f", "4F", "4층", 1138.39)]),  # 3·4층
+    Building("b6", "복지관", "급식실", "6동", "주4", "#d97706",  # 복지관: 주황
+             [_poly("633.9,377.6 666.9,377.6 666.9,490.9 633.9,490.9")],  # 복지관 윤곽 (네모)
+             [Floor("b6-1f", "1F", "1층", 676.8), Floor("b6-2f", "2F", "2층", 362.16),  # 1·2층
+              Floor("b6-l1", "통로1", "연결통로 1층"), Floor("b6-l2", "통로2", "연결통로 2층", 53.01),  # 연결통로 1·2층
+              Floor("b6-lr", "통로R", "연결통로 지붕")]),  # 연결통로 지붕
+    Building("b3", "단재관", "교사", "3동", "주5", "#0891b2",  # 단재관: 청록
+             [_poly("584.7,202.6 600.8,202.6 600.8,260 618.7,260 618.7,281.6 606.6,281.6 606.6,315.7 599.7,315.7 599.7,274.3 577.4,274.3 577.4,210.9 584.7,210.9")],  # 단재관 윤곽
+             [Floor("b3-b1", "B1", "지하 1층", 151.46), Floor("b3-1f", "1F", "1층", 379.97),  # 지하 1층·1층
+              Floor("b3-2f", "2F", "2층", 379.97), Floor("b3-3f", "3F", "3층", 345.05),  # 2·3층
+              Floor("b3-4f", "4F", "4층", 345.05), Floor("b3-rf", "RF", "옥상층")]),  # 4층·옥상층
+    Building("b8", "체육관", "실내체육관", "8동", "주6", "#db2777",  # 체육관: 분홍
+             [_poly("455.1,41.1 563.1,38.5 565.3,123.4 457.2,126.2")],  # 체육관 윤곽
+             [Floor("b8-b1", "B1", "지하 1층", 108.0), Floor("b8-1f", "1F", "1층", 1555.8),  # 지하 1층·1층
+              Floor("b8-2f", "2F", "2층", 693.24), Floor("b8-rf", "RF", "지붕층")]),  # 2층·지붕층
     # 특별교실동(7·9동)은 두 건물: 왼쪽 덕후재(급식실·기숙사), 오른쪽 귀촌관(특별교실). 2층에서만 이어진다.
     # 층 도면은 한 장에 두 건물이 같이 있어서 x = SPLIT_X 에서 나눠 보여준다.
-    Building("b9", "덕후재", "급식실", "9동", "주7", "#4f46e5",
-             [_poly("454.4,165.9 458.7,165.9 458.7,162.7 505.4,162.7 505.4,157.8 537.2,157.8 537.2,202 458.7,202 458.7,180 452.7,180 452.7,167.5")],
-             [Floor(f"b9-{n}f", f"{n}F", f"{n}층", crop=(0, SPLIT_X)) for n in range(1, 6)]),
-    Building("b7", "귀촌관", "특별교실", "7동", "주7", "#ea580c",
-             [_poly("537.4,152.7 577.2,152.7 577.2,168.1 585.2,168.1 585.2,173.4 593,173.4 593,183 597.2,183 597.2,202.9 593,202.9 593,188.7 537.4,188.7")],
-             [Floor(f"b7-{n}f", f"{n}F", f"{n}층", src=f"b9-{n}f", crop=(SPLIT_X - 3, 1028)) for n in range(1, 6)]),
-    Building("b10", "체육실동", "체육실", "10동", "주8", "#65a30d",
-             [_poly("327.4,216 356.6,216 356.6,226.3 335.4,226.3 335.4,229.8 327.4,229.8"),
-              _poly("343,232.5 356.6,232.5 356.6,263.1 343,263.1")],
-             [Floor("b10-1f", "1F", "1층", 120.54)]),
-    Building("b5", "수위실", "부속동", "5동", "부1", "#64748b",
-             [_poly("432,596 442,596 442,627 432,627")],
-             [Floor("b5-1f", "1F", "1층", 90.02)]),
+    Building("b9", "덕후재", "급식실", "9동", "주7", "#4f46e5",  # 덕후재: 남색
+             [_poly("454.4,165.9 458.7,165.9 458.7,162.7 505.4,162.7 505.4,157.8 537.2,157.8 537.2,202 458.7,202 458.7,180 452.7,180 452.7,167.5")],  # 덕후재 윤곽
+             [Floor(f"b9-{n}f", f"{n}F", f"{n}층", crop=(0, SPLIT_X)) for n in range(1, 6)]),  # 1~5층: 도면의 왼쪽(0 ~ 경계)만 보여준다
+    Building("b7", "귀촌관", "특별교실", "7동", "주7", "#ea580c",  # 귀촌관: 주황
+             [_poly("537.4,152.7 577.2,152.7 577.2,168.1 585.2,168.1 585.2,173.4 593,173.4 593,183 597.2,183 597.2,202.9 593,202.9 593,188.7 537.4,188.7")],  # 귀촌관 윤곽
+             [Floor(f"b7-{n}f", f"{n}F", f"{n}층", src=f"b9-{n}f", crop=(SPLIT_X - 3, 1028)) for n in range(1, 6)]),  # 1~5층: 덕후재 도면을 같이 쓰고 오른쪽만 보여준다
+    Building("b10", "체육실동", "체육실", "10동", "주8", "#65a30d",  # 체육실동: 연두
+             [_poly("327.4,216 356.6,216 356.6,226.3 335.4,226.3 335.4,229.8 327.4,229.8"),  # 체육실동 윤곽 1
+              _poly("343,232.5 356.6,232.5 356.6,263.1 343,263.1")],  # 체육실동 윤곽 2
+             [Floor("b10-1f", "1F", "1층", 120.54)]),  # 1층
+    Building("b5", "수위실", "부속동", "5동", "부1", "#64748b",  # 수위실: 회색
+             [_poly("432,596 442,596 442,627 432,627")],  # 수위실 윤곽
+             [Floor("b5-1f", "1F", "1층", 90.02)]),  # 1층
     # 배치도에 정확한 위치가 없어 지도 윤곽 없이 목록에서만 연다
-    Building("wc", "화장실", "부속동 · 위치 미표시", "", "부3", "#64748b",
-             [], [Floor("wc-1f", "1F", "1층", 25.2)]),
-]
+    Building("wc", "화장실", "부속동 · 위치 미표시", "", "부3", "#64748b",  # 야외 화장실
+             [], [Floor("wc-1f", "1F", "1층", 25.2)]),  # 윤곽 없음, 1층만
+]  # 건물 목록 끝
 
-BUILDING_BY_ID = {b.id: b for b in BUILDINGS}
-FLOOR_INDEX = {f.id: (b, f) for b in BUILDINGS for f in b.floors}
+BUILDING_BY_ID = {b.id: b for b in BUILDINGS}  # 건물 id 로 건물을 바로 찾는 사전
+FLOOR_INDEX = {f.id: (b, f) for b in BUILDINGS for f in b.floors}  # 층 id 로 (건물, 층)을 바로 찾는 사전
 
 # ── 연결복도 버튼 ──────────────────────────────────
 # 층 도면 위 연결복도 자리에 버튼을 놓고, 누르면 이어진 건물의 같은 층으로 간다.
 # {층 id: [(x, y, 갈 층 id), ...]}  x, y 는 그 층 도면 좌표 (연결복도 글자 자리)
-LINKS = {
+LINKS = {  # 연결복도 버튼 목록 시작
     # 만대관: 왼쪽 끝 → 중학교, 오른쪽 끝 → 덕린관
-    "b1-1f": [(73, 124, "b4-1f"), (732, 115, "b2-1f")],
-    "b1-2f": [(73, 124, "b4-2f"), (732, 115, "b2-2f")],
-    "b1-3f": [(83, 131, "b4-3f"), (732, 108, "b2-3f")],
-    "b1-4f": [(75, 120, "b4-4f"), (732, 113, "b2-4f")],
+    "b1-1f": [(73, 124, "b4-1f"), (732, 115, "b2-1f")],  # 만대관 1층 → 중학교 1층, 덕린관 1층
+    "b1-2f": [(73, 124, "b4-2f"), (732, 115, "b2-2f")],  # 만대관 2층 → 중학교 2층, 덕린관 2층
+    "b1-3f": [(83, 131, "b4-3f"), (732, 108, "b2-3f")],  # 만대관 3층 → 중학교 3층, 덕린관 3층
+    "b1-4f": [(75, 120, "b4-4f"), (732, 113, "b2-4f")],  # 만대관 4층 → 중학교 4층, 덕린관 4층
     # 덕린관: 아래 왼쪽 → 만대관, 2층 위쪽 → 단재관
-    "b2-1f": [(253, 222, "b1-1f")],
-    "b2-2f": [(254, 246, "b1-2f"), (760, 40, "b3-2f")],
-    "b2-3f": [(254, 222, "b1-3f")],
-    "b2-4f": [(254, 222, "b1-4f")],
+    "b2-1f": [(253, 222, "b1-1f")],  # 덕린관 1층 → 만대관 1층
+    "b2-2f": [(254, 246, "b1-2f"), (760, 40, "b3-2f")],  # 덕린관 2층 → 만대관 2층, 단재관 2층
+    "b2-3f": [(254, 222, "b1-3f")],  # 덕린관 3층 → 만대관 3층
+    "b2-4f": [(254, 222, "b1-4f")],  # 덕린관 4층 → 만대관 4층
     # 단재관: 오른쪽 → 덕린관, 2층 왼쪽 끝(계단실 2) → 귀촌관
-    "b3-1f": [(799, 142, "b2-1f")],
-    "b3-2f": [(799, 142, "b2-2f"), (24, 178, "b7-2f")],
+    "b3-1f": [(799, 142, "b2-1f")],  # 단재관 1층 → 덕린관 1층
+    "b3-2f": [(799, 142, "b2-2f"), (24, 178, "b7-2f")],  # 단재관 2층 → 덕린관 2층, 귀촌관 2층
     # 중학교: "본관에 연결" → 만대관, 오른쪽 위 연결복도 → 복지관 연결통로
-    "b4-1f": [(113, 22, "b1-1f")],
-    "b4-2f": [(96, 22, "b1-2f"), (830, 55, "b6-l2")],
-    "b4-3f": [(96, 22, "b1-3f"), (826, 88, "b6-lr")],
-    "b4-4f": [(96, 22, "b1-4f")],
+    "b4-1f": [(113, 22, "b1-1f")],  # 중학교 1층 → 만대관 1층
+    "b4-2f": [(96, 22, "b1-2f"), (830, 55, "b6-l2")],  # 중학교 2층 → 만대관 2층, 복지관 연결통로 2층
+    "b4-3f": [(96, 22, "b1-3f"), (826, 88, "b6-lr")],  # 중학교 3층 → 만대관 3층, 연결통로 지붕
+    "b4-4f": [(96, 22, "b1-4f")],  # 중학교 4층 → 만대관 4층
     # 귀촌관: 2층 연결복도 → 단재관
     # 덕후재 ↔ 귀촌관: 2층 가운데 복도로만 이어진다
-    "b9-2f": [(572, 227, "b7-2f")],
-    "b7-2f": [(938, 333, "b3-2f"), (604, 228, "b9-2f")],
-}
+    "b9-2f": [(572, 227, "b7-2f")],  # 덕후재 2층 → 귀촌관 2층
+    "b7-2f": [(938, 333, "b3-2f"), (604, 228, "b9-2f")],  # 귀촌관 2층 → 단재관 2층, 덕후재 2층
+}  # 연결복도 버튼 목록 끝
 
-CATEGORIES = {
-    "facility": "🛠 시설 파손",
-    "slip": "⚠️ 미끄럼·낙상",
-    "fire": "🔥 전기·화재",
-    "traffic": "🚸 교통·보행",
-    "hygiene": "🧴 위생·환경",
-    "security": "🔒 방범·출입",
-    "etc": "• 기타",
-}
+CATEGORIES = {  # 신고 유형: 코드 → 화면에 보일 이름
+    "facility": "🛠 시설 파손",  # 시설 파손
+    "slip": "⚠️ 미끄럼·낙상",  # 미끄럼·낙상
+    "fire": "🔥 전기·화재",  # 전기·화재
+    "traffic": "🚸 교통·보행",  # 교통·보행
+    "hygiene": "🧴 위생·환경",  # 위생·환경
+    "security": "🔒 방범·출입",  # 방범·출입
+    "etc": "• 기타",  # 기타
+}  # 신고 유형 끝
 
 SEVERITIES = {  # id: (이름, 색)
-    "urgent": ("긴급", "#dc2626"),
-    "high": ("높음", "#ea580c"),
-    "mid": ("보통", "#ca8a04"),
-    "low": ("낮음", "#2563eb"),
-}
+    "urgent": ("긴급", "#dc2626"),  # 긴급 = 빨강
+    "high": ("높음", "#ea580c"),  # 높음 = 주황
+    "mid": ("보통", "#ca8a04"),  # 보통 = 노랑
+    "low": ("낮음", "#2563eb"),  # 낮음 = 파랑
+}  # 위험도 끝
 
 # 신고 종류: id: (이름, 표시, 핀 색) — 불편 신고는 위험도와 상관없이 보라색 핀
-KINDS = {
-    "danger": ("위험", "⚠️", None),
-    "incon": ("불편", "🙁", "#7c3aed"),
-}
+KINDS = {  # 신고 종류 목록
+    "danger": ("위험", "⚠️", None),  # 위험 신고 (핀 색은 위험도 색을 따른다)
+    "incon": ("불편", "🙁", "#7c3aed"),  # 불편 신고 (보라색 핀)
+}  # 신고 종류 끝
 
 
-def kind_of(r: dict) -> str:
-    """신고 종류 (예전 신고에는 없으니 위험으로 본다)."""
-    return r.get("kind") if r.get("kind") in KINDS else "danger"
+def kind_of(r: dict) -> str:  # 신고의 종류를 알려주는 함수
+    """신고 종류 (예전 신고에는 없으니 위험으로 본다)."""  # 이 함수가 하는 일을 적은 설명글
+    return r.get("kind") if r.get("kind") in KINDS else "danger"  # 종류 값이 올바르면 그대로, 아니면 위험
 
 
-STATUSES = {
-    "new": "접수",
-    "doing": "처리중",
-    "done": "처리완료",
-    "rejected": "반려",
-}
-OPEN_STATUSES = ("new", "doing")
+STATUSES = {  # 처리 상태: 코드 → 화면에 보일 이름
+    "new": "접수",  # 접수
+    "doing": "처리중",  # 처리중
+    "done": "처리완료",  # 처리 완료
+    "rejected": "반려",  # 반려
+}  # 처리 상태 끝
+OPEN_STATUSES = ("new", "doing")  # 아직 처리가 안 끝난 상태들
 
 
-def place_name(map_id: str) -> str:
-    """신고 위치(map id)를 사람이 읽는 이름으로."""
-    if map_id == SITE_ID:
-        return "캠퍼스 야외"
-    hit = FLOOR_INDEX.get(map_id)
-    return f"{hit[0].name} {hit[1].name}" if hit else map_id
+def place_name(map_id: str) -> str:  # 층 id 를 "덕린관 2층" 같은 이름으로 바꾸는 함수
+    """신고 위치(map id)를 사람이 읽는 이름으로."""  # 이 함수가 하는 일을 적은 설명글
+    if map_id == SITE_ID:  # 캠퍼스 배치도면
+        return "캠퍼스 야외"  # 야외라고 돌려준다
+    hit = FLOOR_INDEX.get(map_id)  # 층 id 로 (건물, 층)을 찾는다
+    return f"{hit[0].name} {hit[1].name}" if hit else map_id  # 찾았으면 "건물 층", 못 찾으면 id 그대로
 
 
-def plan_of(map_id: str) -> tuple[str, tuple[float, float] | None]:
-    """층(또는 배치도)의 도면 주소와 보여줄 x 범위."""
-    hit = FLOOR_INDEX.get(map_id)
-    f = hit[1] if hit else None
-    return f"./plans/{(f.src if f and f.src else map_id)}.svg", (f.crop if f else None)
+def plan_of(map_id: str) -> tuple[str, tuple[float, float] | None]:  # 층의 도면 파일 주소와 잘라 보여줄 범위를 알려주는 함수
+    """층(또는 배치도)의 도면 주소와 보여줄 x 범위."""  # 이 함수가 하는 일을 적은 설명글
+    hit = FLOOR_INDEX.get(map_id)  # 층 id 로 (건물, 층)을 찾는다
+    f = hit[1] if hit else None  # 층 정보 (없으면 None)
+    return f"./plans/{(f.src if f and f.src else map_id)}.svg", (f.crop if f else None)  # 다른 층 도면을 같이 쓰면 그 파일, 아니면 자기 파일 + 잘라낼 범위
 
 
-def building_of(map_id: str) -> Building | None:
-    hit = FLOOR_INDEX.get(map_id)
-    return hit[0] if hit else None
+def building_of(map_id: str) -> Building | None:  # 층 id 로 건물을 찾는 함수
+    hit = FLOOR_INDEX.get(map_id)  # 층 id 로 (건물, 층)을 찾는다
+    return hit[0] if hit else None  # 찾았으면 건물, 못 찾으면 None
 
 
-def point_in_poly(x: float, y: float, poly: list[tuple[float, float]]) -> bool:
-    inside = False
-    j = len(poly) - 1
-    for i, (xi, yi) in enumerate(poly):
-        xj, yj = poly[j]
-        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
-            inside = not inside
-        j = i
-    return inside
+def point_in_poly(x: float, y: float, poly: list[tuple[float, float]]) -> bool:  # 점(x, y)이 다각형 안에 있는지 확인하는 함수
+    inside = False  # 처음엔 바깥이라고 본다
+    j = len(poly) - 1  # 바로 앞 꼭짓점 번호 (처음엔 마지막 점)
+    for i, (xi, yi) in enumerate(poly):  # 꼭짓점을 하나씩 보면서
+        xj, yj = poly[j]  # 앞 꼭짓점
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:  # 점에서 오른쪽으로 그은 선이 이 변과 만나면
+            inside = not inside  # 안/밖을 뒤집는다 (만난 횟수가 홀수면 안쪽)
+        j = i  # 다음 변을 위해 앞 꼭짓점을 바꾼다
+    return inside  # 결과를 돌려준다
 
 
-def building_at(x: float, y: float, pad: float = 4.0) -> Building | None:
-    """배치도 좌표에 있는 건물. 작은 건물도 누르기 쉽게 주변 pad 만큼 여유를 준다."""
-    for b in BUILDINGS:
-        for poly in b.polys:
-            if point_in_poly(x, y, poly):
-                return b
-    for b in BUILDINGS:
-        for poly in b.polys:
-            xs, ys = [p[0] for p in poly], [p[1] for p in poly]
-            if min(xs) - pad <= x <= max(xs) + pad and min(ys) - pad <= y <= max(ys) + pad:
-                return b
-    return None
+def building_at(x: float, y: float, pad: float = 4.0) -> Building | None:  # 배치도의 한 점에 있는 건물을 찾는 함수
+    """배치도 좌표에 있는 건물. 작은 건물도 누르기 쉽게 주변 pad 만큼 여유를 준다."""  # 이 함수가 하는 일을 적은 설명글
+    for b in BUILDINGS:  # 모든 건물을 보면서
+        for poly in b.polys:  # 건물 윤곽마다
+            if point_in_poly(x, y, poly):  # 점이 윤곽 안에 있으면
+                return b  # 그 건물
+    for b in BUILDINGS:  # 정확히 안에 없으면 다시 모든 건물을 보면서
+        for poly in b.polys:  # 건물 윤곽마다
+            xs, ys = [p[0] for p in poly], [p[1] for p in poly]  # 윤곽의 x 들과 y 들
+            if min(xs) - pad <= x <= max(xs) + pad and min(ys) - pad <= y <= max(ys) + pad:  # 윤곽을 둘러싼 네모에서 조금 바깥까지 들어오면
+                return b  # 그 건물
+    return None  # 건물이 없으면 None
 
 
-def link_label(floor_id: str) -> str:
-    """연결복도 버튼 글자, 예: '덕린관 2층'."""
-    hit = FLOOR_INDEX.get(floor_id)
-    return f"{hit[0].name.removesuffix(' 교사')} {hit[1].name}" if hit else floor_id
+def link_label(floor_id: str) -> str:  # 연결복도 버튼에 쓸 글자를 만드는 함수
+    """연결복도 버튼 글자, 예: '덕린관 2층'."""  # 이 함수가 하는 일을 적은 설명글
+    hit = FLOOR_INDEX.get(floor_id)  # 갈 층의 (건물, 층)
+    return f"{hit[0].name.removesuffix(' 교사')} {hit[1].name}" if hit else floor_id  # "덕린관 2층" 처럼 (끝의 " 교사" 는 뺀다)
 
 
 # ── 검색 ─────────────────────────────────────────
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", "", s).lower()
+def _norm(s: str) -> str:  # 검색용으로 띄어쓰기를 지우고 소문자로 바꾸는 함수
+    return re.sub(r"\s+", "", s).lower()  # 공백 지우기 + 소문자
 
 
-def search(text: str, limit: int = 8) -> list[dict]:
-    """'2-1', '2학년 1반', '409', '보건실', '덕린관' 같은 말로 방·반·건물을 찾는다."""
-    from rooms import CLASSES, ROOMS
+def search(text: str, limit: int = 8) -> list[dict]:  # 교실·반·건물을 검색하는 함수
+    """'2-1', '2학년 1반', '409', '보건실', '덕린관' 같은 말로 방·반·건물을 찾는다."""  # 이 함수가 하는 일을 적은 설명글
+    from rooms import CLASSES, ROOMS  # 반 목록과 방 목록을 불러온다
 
-    q = _norm(text)
-    if not q:
-        return []
-    m = re.fullmatch(r"(\d)학년(\d{1,2})반?", q) or re.fullmatch(r"(\d)[-.](\d{1,2})반?", q)
-    if m:
-        q = f"{m.group(1)}-{m.group(2)}"
-    q = q.removesuffix("호") if re.fullmatch(r"[bw]?\d{3}호", q) else q
+    q = _norm(text)  # 검색어 정리
+    if not q:  # 검색어가 비어 있으면
+        return []  # 결과 없음
+    m = re.fullmatch(r"(\d)학년(\d{1,2})반?", q) or re.fullmatch(r"(\d)[-.](\d{1,2})반?", q)  # "2학년1반", "2-1", "2.1" 같은 꼴인지 확인
+    if m:  # 그런 꼴이면
+        q = f"{m.group(1)}-{m.group(2)}"  # "2-1" 꼴로 통일한다
+    q = q.removesuffix("호") if re.fullmatch(r"[bw]?\d{3}호", q) else q  # "409호" 면 끝의 "호" 를 뗀다
 
     found = []  # (순위, 결과)
 
-    def rank(*keys):
-        best = None
-        for i, k in enumerate(keys):
-            k = _norm(k)
-            if not k:
-                continue
-            r = 0 if k == q else 2 if k.startswith(q) else 4 if q in k else None
-            if r is not None:
-                r += min(i, 1)
-                best = r if best is None else min(best, r)
-        return best
+    def rank(*keys):  # 검색어가 얼마나 잘 맞는지 점수를 매기는 함수 (작을수록 잘 맞음)
+        best = None  # 가장 좋은 점수 (아직 없음)
+        for i, k in enumerate(keys):  # 비교할 이름들을 하나씩
+            k = _norm(k)  # 이름 정리
+            if not k:  # 이름이 비어 있으면
+                continue  # 건너뛴다
+            r = 0 if k == q else 2 if k.startswith(q) else 4 if q in k else None  # 똑같으면 0, 앞부분이 같으면 2, 들어 있으면 4, 아니면 없음
+            if r is not None:  # 맞았으면
+                r += min(i, 1)  # 두 번째 이름부터 맞은 건 1점 더한다
+                best = r if best is None else min(best, r)  # 가장 좋은 점수를 남긴다
+        return best  # 점수를 돌려준다
 
-    for fid, cls, num, x, y in CLASSES:
-        r = rank(cls, num)
-        if r is not None:
-            found.append((r, {"floor": fid, "x": x, "y": y, "title": cls,
-                              "sub": place_name(fid) + (f" · {num}호" if num else "")}))
-    class_nums = {(fid, num) for fid, _, num, _, _ in CLASSES if num}
-    for fid, num, name, x, y in ROOMS:
-        if (fid, num) in class_nums:
+    for fid, cls, num, x, y in CLASSES:  # 반 교실을 하나씩 보면서
+        r = rank(cls, num)  # 반 이름·방 번호로 점수
+        if r is not None:  # 맞으면
+            found.append((r, {"floor": fid, "x": x, "y": y, "title": cls,  # 결과에 넣는다 (층, 위치, 반 이름)
+                              "sub": place_name(fid) + (f" · {num}호" if num else "")}))  # 설명: 위치 · 방 번호
+    class_nums = {(fid, num) for fid, _, num, _, _ in CLASSES if num}  # 반 교실로 쓰는 방 번호들
+    for fid, num, name, x, y in ROOMS:  # 모든 방을 하나씩 보면서
+        if (fid, num) in class_nums:  # 반 교실이면
             continue  # 반 교실은 반 이름(예: 2-1 · 409호)으로 나온다
-        r = rank(num, name)
-        if r is not None:
-            found.append((r + 0.5, {"floor": fid, "x": x, "y": y, "title": f"{num} {name}".strip(),
-                                    "sub": place_name(fid)}))
-    for b in BUILDINGS:
-        r = rank(b.name, b.sub)
-        if r is not None and b.floors:
-            found.append((r + 0.2, {"floor": b.default_floor.id, "x": None, "y": None, "title": b.name,
-                                    "sub": "건물 · " + " · ".join(x for x in (b.dong, b.sub) if x)}))
-    found.sort(key=lambda t: t[0])
-    return [f for _, f in found[:limit]]
+        r = rank(num, name)  # 방 번호·방 이름으로 점수
+        if r is not None:  # 맞으면
+            found.append((r + 0.5, {"floor": fid, "x": x, "y": y, "title": f"{num} {name}".strip(),  # 결과에 넣는다 (반보다 조금 뒤로)
+                                    "sub": place_name(fid)}))  # 설명: 위치
+    for b in BUILDINGS:  # 모든 건물을 보면서
+        r = rank(b.name, b.sub)  # 건물 이름·설명으로 점수
+        if r is not None and b.floors:  # 맞고 층이 있으면
+            found.append((r + 0.2, {"floor": b.default_floor.id, "x": None, "y": None, "title": b.name,  # 결과에 넣는다 (그 건물 1층으로)
+                                    "sub": "건물 · " + " · ".join(x for x in (b.dong, b.sub) if x)}))  # 설명: 동 번호 · 건물 설명
+    found.sort(key=lambda t: t[0])  # 점수가 좋은 순으로 정렬
+    return [f for _, f in found[:limit]]  # 앞에서부터 limit 개만 돌려준다
