@@ -278,7 +278,7 @@ def filtered():
 def render_table():
     rows = filtered()
     q("#listCount").textContent = f"{len(rows)}건 · 줄을 누르면 자세한 내용과 처리 메뉴가 열려요"
-    head = "<thead><tr><th>접수</th><th>종류</th><th>위험도</th><th>상태</th><th>제목</th><th>위치</th><th>장소</th><th>유형</th><th>담당</th><th title="나도 봤어요">🙋</th><th>📷</th></tr></thead>"
+    head = "<thead><tr><th>접수</th><th>종류</th><th>위험도</th><th>상태</th><th>제목</th><th>위치</th><th>장소</th><th>유형</th><th>담당</th><th title='나도 봤어요'>🙋</th><th>📷</th></tr></thead>"
     body = "".join(
         f'<tr data-id="{r["id"]}" class="{"is-selected" if r["id"] == state["sel"] else ""}">'
         f'<td>{parse_time(r["created_at"]).astimezone(KST):%m-%d %H:%M}</td><td>{kind_badge(r)}</td><td>{severity_badge(r["severity"])}</td>'
