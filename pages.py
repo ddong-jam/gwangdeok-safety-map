@@ -9,8 +9,8 @@ STUDENT = '''
         <svg viewBox="0 0 32 32"><path d="M16 30c-1-4-10-9-10-17a10 10 0 0 1 20 0c0 8-9 13-10 17z" /><circle cx="16" cy="13" r="4" /></svg> <!-- 지도 핀 모양 로고 -->
       </span> <!-- 로고 그림 상자 끝 -->
       <span class="brand-text"> <!-- 로고 글자 -->
-        <strong>광덕 안전지도</strong> <!-- 사이트 이름 -->
-        <small>광덕중·고등학교 안전신문고</small> <!-- 작은 설명 -->
+        <strong>광덕신문고</strong> <!-- 사이트 이름 -->
+        <small>광덕중·고등학교 위험·불편 신고</small> <!-- 작은 설명 -->
       </span> <!-- 로고 글자 끝 -->
     </a> <!-- 로고 끝 -->
     <div class="topbar-actions"> <!-- 오른쪽 버튼 자리 -->
@@ -150,7 +150,7 @@ TEACHER = '''
       <span class="brand-mark t-mark" aria-hidden="true">🛡️</span> <!-- 방패 아이콘 -->
       <span class="brand-text"> <!-- 로고 글자 -->
         <strong>선생님 관리</strong> <!-- 화면 이름 -->
-        <small>광덕 안전지도 · 신고 관리</small> <!-- 작은 설명 -->
+        <small>광덕신문고 · 신고 관리</small> <!-- 작은 설명 -->
       </span> <!-- 로고 글자 끝 -->
     </a> <!-- 로고 끝 -->
     <div class="topbar-actions"> <!-- 오른쪽 자리 -->

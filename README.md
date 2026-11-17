@@ -1,4 +1,4 @@
-# 광덕 안전지도 (v2 · Python)
+# 광덕신문고 (v2 · Python)
 
 광덕중·고등학교 캠퍼스 **2D 평면도 기반 안전신문고**입니다.
 화면 틀·꾸미기·동작까지 우리가 쓴 코드는 모두 파이썬(`.py`)이고 (`index.html`·`teacher.html` 은 파이썬을 불러오는 시작용 몇 줄), [PyScript](https://pyscript.net)로 브라우저 안에서 바로 실행됩니다.
@@ -90,7 +90,7 @@ python serve.py
 - 선생님용: <http://localhost:5178/teacher.html>
 
 (파일을 그냥 더블클릭해서 열면 파이썬 파일을 못 불러옵니다. 꼭 `serve.py` 로 여세요.)
-파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=36` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
+파이썬 파일을 고친 뒤에는 `index.html`·`teacher.html` 의 `?v=37` 숫자를, 도면(`plans/`)을 바꾼 뒤에는 `viewer.py` 의 `PLANS_VERSION` 을 올려야 브라우저가 옛날 파일을 쓰지 않습니다.
 
 ## 폴더 구조
 
@@ -168,6 +168,7 @@ python tools/build_rooms.py --index 2=ocr2.tsv 3=ocr3.tsv 4=ocr4.tsv 6=ocr6.tsv
 | v2.6.3 | 선생님 화면이 열리지 않던 문제 수정 (v2.6.0 에서 넣은 공감 칸 제목의 따옴표 오류) |
 | v2.6.4 | (v2.6.3 과 같은 버전 — 태그만 한 번 더 붙음) |
 | v2.6.5 | 모든 소스 코드(파이썬·HTML·CSS·SQL) 줄마다 한국어 주석 — 동작은 그대로 |
+| v2.6.6 | 사이트 이름을 "광덕신문고" 로 (탭 제목, 맨 위 이름, 로딩 화면) |
 | v2.3.1 | 홈(캠퍼스 배치도)에서도 확대·이동 가능 |
 | v2.3.0 | 모두 파이썬으로: CSS → `theme.py`, 화면 틀 HTML → `pages.py` (index.html·teacher.html 은 시작용 몇 줄만), OCR PowerShell → `tools/ocr.py`, SQL → `tools/supabase_setup.py` |
 | v2.2.2 | 층 화면 오른쪽 패널 위에 "캠퍼스로 돌아가기" 버튼 |

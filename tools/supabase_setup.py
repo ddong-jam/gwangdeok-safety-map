@@ -8,7 +8,7 @@
 import subprocess  # 다른 프로그램(윈도우 clip)을 실행하는 도구 — 클립보드 복사에 쓴다
 import sys  # 실행할 때 받은 값을 읽는 도구
 
-SQL = r'''-- 광덕 안전지도 · 공용 모드 데이터베이스 (Supabase → SQL Editor 에 통째로 붙여넣고 Run)
+SQL = r'''-- 광덕신문고 · 공용 모드 데이터베이스 (Supabase → SQL Editor 에 통째로 붙여넣고 Run)
 -- 학생(로그인 없음): 신고 접수 + 공개 칸만 보기 (신고자 이름·사진·담당자는 못 봄)
 -- 선생님(admins 에 등록된 계정): 모든 신고 보기 · 처리 · 삭제
 
